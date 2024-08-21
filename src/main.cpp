@@ -141,12 +141,12 @@ void loop()
     // FOR TEST ONLY REMOVE FOR REAL FLIGHT :
     if (current_pitch > 50)
     {
-      currentMode = NAVIGATE; // Go to NAVIGATE Mode
       target_roll = 0;
       target_pitch = 0;
       pitch_step_value = 5; // Remise à plat progressive
       target_yaw = 0;
       //  stabilize(false, target_roll, false, 0, false, target_pitch, true, pitch_step_value, false, 0, true, 0); // Stab R:0, P:takeoff_angle, Y:blocked
+      currentMode = NAVIGATE; // Go to NAVIGATE Mode
     }
 
     // check if current_altitude > home_altitude + 20m
@@ -154,13 +154,13 @@ void loop()
     {
 
       // FOR TEST MODE :
-      currentMode = NAVIGATE; // Go to NAVIGATE Mode
 
       target_roll = 0;
       target_pitch = 0;
       pitch_step_value = 5; // Remise à plat progressive
       target_yaw = 0;
       // stabilize(false, target_roll, false, 0, false, target_pitch, true, pitch_step_value, false, 0, true, 0); // Stab R:0, P:takeoff_angle, Y:blocked
+      currentMode = NAVIGATE; // Go to NAVIGATE Mode
 
       // USE THIS FOR REAL FLIGHT :
       /*
@@ -219,14 +219,17 @@ void loop()
       {
         currentNavigationMode = CORRECTING_HEADING;
       }
+
       else if (isCorrectingAltitude)
       {
         currentNavigationMode = CORRECTING_ALTITUDE;
       }
+
       else if (abs(heading_error) > heading_tolerance)
       {
         currentNavigationMode = CORRECTING_HEADING;
       }
+
       else if (abs(altitude_error) > altitude_tolerance)
       {
         currentNavigationMode = CORRECTING_ALTITUDE;
@@ -237,6 +240,11 @@ void loop()
         if (!stabilized)
         {
           currentNavigationMode = STABILIZING;
+        }
+
+        else
+        {
+          Serial.println("PLANE STABILIZED - HEADING IS GOOD - ALTTIUDE IS GOOD - ENJOY THE FLIGHT");
         }
       }
 
