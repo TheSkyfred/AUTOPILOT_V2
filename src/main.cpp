@@ -1,6 +1,9 @@
 #include <Arduino.h>
 
 #include "def.h"
+
+#include "Wire.h"
+
 #include "config.h"
 #include "sensors.h"
 #include "modes.h"
@@ -34,7 +37,7 @@
 FlightMode currentMode = INIT;
 EngineStatus currentEngineStatus = ENGINE_OFF;
 SpeedMode currentSpeedMode = COEFFICIENT_CALC;
-NavigationMode currentNavigationMode = FLYING;
+NavigationMode currentNavigationMode = STABILIZING;
 TurnMode currentTurnMode = NO_TURN;
 LandingMode currentLandingMode = INITIAL_APPROACH;
 
@@ -45,6 +48,8 @@ float avgDistance = 0;
 
 void setup()
 {
+  Wire.begin();
+  Wire.setClock(400000); // Définir le taux de données I2C à 400 kHz
 
   pinMode(BUZZERPIN, OUTPUT);
 
@@ -73,49 +78,46 @@ void setup()
 
   // battery_initial_check();
   init_PID();
+
+  GPS_signal();
 }
 
 void loop()
 {
 
-  // FIRST : update telemetry
   // update_telemetry();
   update_sensors();
-  // Then :
 
   switch (currentMode)
   {
 
   case INIT:
 
-    // Check for GPS Signal Quality
-    if (GPS_signal())
-    {
-      GPS_set_home();     // We Define the Home Point Position (Latitude, longitude, altitude)
-      update_waypoints(); // Update GPS points with Home Point
+    GPS_set_home();     // We Define the Home Point Position (Latitude, longitude, altitude)
+    update_waypoints(); // Update GPS points with Home Point
 
-      calculateTotalDistance(); // Calculer la distance totale (optionnel)
+    calculateTotalDistance(); // Calculer la distance totale (optionnel)
+    check_altitude();
 
-      // RGB_LED(BLUE);         // Définit la couleur bleue (optionnel)
+    currentMode = ARMED; // Passer en mode ARMED
 
-      currentMode = ARMED; // Passer en mode ARMÉ (optionnel)
-
-    }; // if GPS Quality is ok, then go to ARMED (see GPS function)
-
-    break;
+    break; // INIT
 
   case ARMED:
-
-    // wait for instruction
 
     // BUZZER HELP
     target_pitch = takeoff_angle;
 
+    // INSIDE RANGE : READY FOR TAKEOFF
     if (current_pitch >= (takeoff_angle - 2) && current_pitch <= (takeoff_angle + 2))
     {
-      currentMode = TAKEOFF;
       buzzer_mute();
+
+      currentMode = TAKEOFF;
+      break;
     }
+
+    // OUTSIDE RANGE : WAIT FOR GOOD TAKEOFF ANGLE
 
     else if (current_pitch >= (takeoff_angle - takeoff_tolerance) && current_pitch <= (takeoff_angle + takeoff_tolerance))
     {
@@ -130,85 +132,41 @@ void loop()
       buzzer_mute();
     }
 
-    break;
+    break; // ARMED
 
   case TAKEOFF:
-
     target_roll = 0;
     target_pitch = takeoff_angle;
-    target_yaw = 0;
+    // YAW BLOCKED
 
     // FOR TEST ONLY REMOVE FOR REAL FLIGHT :
-    if (current_pitch > 50)
+    if (current_pitch > 40)
     {
-      target_roll = 0;
-      target_pitch = 0;
-      pitch_step_value = 5; // Remise à plat progressive
-      target_yaw = 0;
-      //  stabilize(false, target_roll, false, 0, false, target_pitch, true, pitch_step_value, false, 0, true, 0); // Stab R:0, P:takeoff_angle, Y:blocked
       currentMode = NAVIGATE; // Go to NAVIGATE Mode
+      break;
     }
 
     // check if current_altitude > home_altitude + 20m
     else if (current_GPS_altitude > home_point.altitude + takeoff_security_altitude) // REPLACE BY IF !!
     {
-
-      // FOR TEST MODE :
-
-      target_roll = 0;
-      target_pitch = 0;
-      pitch_step_value = 5; // Remise à plat progressive
-      target_yaw = 0;
-      // stabilize(false, target_roll, false, 0, false, target_pitch, true, pitch_step_value, false, 0, true, 0); // Stab R:0, P:takeoff_angle, Y:blocked
       currentMode = NAVIGATE; // Go to NAVIGATE Mode
-
-      // USE THIS FOR REAL FLIGHT :
-      /*
-      if (engine_coefficient == 0) // Check is engine_coefficient is defined or not
-      {
-        currentMode = CALIBRATE_SPEED; // Go to CALIBRATE_SPEED Mode
-      }
-      else
-      {
-        currentMode = NAVIGATE; // Go to NAVIGATE Mode
-      }
-      */    }
-
-      else
-      {
-        // stabilize(false, target_roll, false, 0, false, target_pitch, false, 0, true, 0, false, 0); // Stab R:0, P:takeoff_angle, Y:blocked
-        set_engine(full_motor_speed); // set engine to full speed
-      }
-
-      break;
-
-  case CALIBRATE_SPEED: // A DEVELOPPER
-
-    switch (currentSpeedMode)
-    {
-
-    case COEFFICIENT_CALC:
-
-      break;
-
-    case SPEED_APPROACH:
-
-      break;
-
-    case SPEED_PID_TUNING:
-
       break;
     }
 
-    // stabilize(false, 0, false, 0, false, takeoff_angle, false, 0, false, 0, true, 0); // Stab R:0, P:takeoff_angle, Y:blocked
+    else
+    {
+      Serial.println("TAKEOFF IN PROGRESS");
+      // STABILIZE THE PLANE
+    }
 
-    // if speed calibrated, go to NAVIGATE mode
-    break;
+    break; // TAKEOFF
 
-    ///////////////////////////NAVIGATION///////////////////
+  case CALIBRATE_SPEED:
+
+    break; // CALIBRATE_SPEED
+
+    //////////NAVIGATE////////////
   case NAVIGATE:
-
-    check_stability();
 
     switch (currentNavigationMode)
     {
@@ -219,131 +177,88 @@ void loop()
       {
         currentNavigationMode = CORRECTING_HEADING;
       }
-
       else if (isCorrectingAltitude)
       {
         currentNavigationMode = CORRECTING_ALTITUDE;
+      }
+      else if (!stabilized)
+      {
+        currentNavigationMode = STABILIZING;
       }
 
       else if (abs(heading_error) > heading_tolerance)
       {
         currentNavigationMode = CORRECTING_HEADING;
+        break;
       }
 
-      else if (abs(altitude_error) > altitude_tolerance)
+            else if (abs(altitude_error) > altitude_tolerance)
       {
         currentNavigationMode = CORRECTING_ALTITUDE;
+        break;
       }
 
       else
       {
-        if (!stabilized)
-        {
-          currentNavigationMode = STABILIZING;
-        }
-
-        else
-        {
-          Serial.println("PLANE STABILIZED - HEADING IS GOOD - ALTTIUDE IS GOOD - ENJOY THE FLIGHT");
-        }
-      }
-
-      break;
-
-    case STABILIZING:
-
-      if (stabilized)
-      {
-        currentNavigationMode = FLYING;
-      }
-      else
-      {
-        // stabilize(false, 0, false, 0, false, 0, false, 0, false, 0, true, 0);
+        Serial.println("ENJOY THE FLIGHT");
       }
 
       break;
 
     case CORRECTING_HEADING:
 
-      Serial.print(currentTurnMode);
+      isTurning = true;
 
-      switch (currentTurnMode)
+      if (abs(heading_error) < heading_tolerance)
       {
-
-        // 1 - check if plane is already turning
-      case NO_TURN:
-
-        // Check if the plane is stable
-
-        if (stabilized)
-        {
-
-          if (abs(heading_error) < heading_tolerance)
-          {
-            currentNavigationMode = FLYING;
-            break;
-          }
-          else if (heading_tolerance < abs(heading_error) || abs(heading_error) > yaw_turn_range)
-          {
-            currentTurnMode = YAW_CORRECTION;
-            // We do a yaw_turn
-          }
-          else
-          {
-
-            // We do a banked_turn
-            currentNavigationMode = CORRECTING_HEADING;
-            currentTurnMode = BANKED_TURN;
-          }
-        }
-        else
-        {
-          target_roll = 0;
-          target_pitch = 0;
-          target_yaw = 0;
-          // stabilize(false, target_roll, false, 0, false, target_pitch, false, 0, false, target_yaw, true, 0); // A CORRIGER
-          currentNavigationMode = STABILIZING;
-        }
-
-        ;
-
-        break;
-
-      case BANKED_TURN:
-
-        target_roll = current_roll - constrain((heading_error - current_yaw) / 2, -max_roll_angle, max_roll_angle);
-        target_pitch = 0;
-        stabilize(false, target_roll, false, 0, false, target_pitch, false, 0, true, 0, false, 0); // A CORRIGER
-
-        break;
-
-      case YAW_CORRECTION:
-
-        break;
+        isTurning = false;
+        currentNavigationMode = STABILIZING;
+      }
+      else
+      {
+        // TURN HERE
       }
 
-      break; //  case CORRECTING_HEADING
+      break; // END CORRECTING HEADING
 
     case CORRECTING_ALTITUDE:
+      isCorrectingAltitude = true;
+
+      if (altitude_error < altitude_tolerance)
+      {
+        isCorrectingAltitude = false;
+
+        currentNavigationMode = STABILIZING;
+        break;
+      }
+      else
+      {
+        // correct altitude
+        target_roll = 0;
+        //   target_pitch = constrain((target_altitude - current_barometer_altitude), -max_roll_angle, max_roll_angle);
+      }
+
+      break;
+
+    case STABILIZING:
+      target_roll = 0;
+      target_pitch = 0;
+      check_stability();
 
       if (stabilized)
       {
-
-        check_altitude();
-
-        if (altitude_error < altitude_tolerance)
-        {
-
-          currentMode = NAVIGATE;
-        }
-        else
-        {
-          // correct altitude
-        }
+        currentNavigationMode = FLYING;
       }
+      break;
+
+    default:
+
+      Serial.println("ERREUR NAVIGATION MODE");
+      break;
     }
 
-    break;
+    break; // NAVIGATE
+           //////////NAVIGATE - END////////////
 
   case LANDING:
 
@@ -396,10 +311,19 @@ void loop()
       // to code
 
       break;
-    }
-  }
 
-  set_servos(RollOutput, PitchOutput, YawOutput);
+    default:
+
+      Serial.println("ERREUR LANDING MODE");
+
+      break;
+    }
+  default:
+
+    Serial.println("ERREUR MAIN MODE");
+    break;
+
+  } // End Switch Main Mode
 
   // AFFICHAGE :
   unsigned long currentMillis = millis();
@@ -415,8 +339,10 @@ void loop()
 
 void display_DATA()
 {
+  Serial.print("S:");
+  Serial.print(stabilized);
 
-  Serial.print("Mode:");
+  Serial.print("-Mode:");
   Serial.print(FlightModeToString(currentMode));
   Serial.print("- WP:");
   Serial.print(current_waypoint_index);
@@ -485,9 +411,8 @@ void display_DATA()
     break;
 
   case NAVIGATE:
-
-    Serial.print(" currentNavMode: ");
-    Serial.print(NavigationModeToString(currentNavigationMode));
+    Serial.print(" NavMode: ");
+    Serial.print(NavModeToString(currentNavigationMode)); // CRASH
 
     Serial.print(" -TRoll:");
     Serial.print(target_roll);

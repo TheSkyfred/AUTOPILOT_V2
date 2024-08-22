@@ -89,7 +89,7 @@ bool GPS_signal()
             hdop = gps.hdop.hdop(); // Obtenir le HDOP en tant que nombre flottant
         }
 
-        if (hdop < 1.00 && gps.location.isValid() && gps.altitude.isValid()) // CHECK HDOP QUALITY
+        if (hdop < 2.00 && gps.location.isValid() && gps.altitude.isValid()) // CHECK HDOP QUALITY
         {
             Serial.println("GPS SIGNAL QUALITY OK");
             Serial.print("HDOP: ");

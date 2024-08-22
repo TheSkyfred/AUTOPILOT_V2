@@ -52,7 +52,6 @@ extern bool isStable;
 extern double RollInput, RollOutput, RollSetpoint, rollKp, rollKi, rollKd;
 extern double PitchInput, PitchOutput, PitchSetpoint, pitchKp, pitchKi, pitchKd;
 extern double YawInput, YawOutput, YawSetpoint, yawKp, yawKi, yawKd;
-extern bool is_stable;
 extern bool roll_block_condition, pitch_block_condition, yaw_block_condition;
 extern float roll_correction, pitch_correction, yaw_correction;
 extern bool roll_step_condition, pitch_step_condition, yaw_step_condition;

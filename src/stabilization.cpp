@@ -59,8 +59,6 @@ PID rollPID(&RollInput, &RollOutput, &RollSetpoint, rollKp, rollKi, rollKd, DIRE
 PID pitchPID(&PitchInput, &PitchOutput, &PitchSetpoint, pitchKp, pitchKi, pitchKd, DIRECT);
 PID yawPID(&YawInput, &YawOutput, &YawSetpoint, yawKp, yawKi, yawKd, DIRECT);
 
-bool is_stable = false;
-
 void init_PID()
 {
     // Initialize PID controllers
@@ -71,8 +69,6 @@ void init_PID()
     yawPID.SetMode(AUTOMATIC);
     yawPID.SetOutputLimits(-SERVOMIN, SERVOMAX); // Limites de sortie du PID pour correspondre à la position du servomoteur
 };
-
-
 
 void stabilize(
     bool roll_block_condition,
@@ -155,7 +151,8 @@ bool stabilizing = false;
 
 void check_stability()
 {
-    if (abs(current_roll) <= STABILIZATION_TOLERANCE && abs(current_pitch) <= STABILIZATION_TOLERANCE)
+    if (abs(current_roll) >= (target_roll - STABILIZATION_TOLERANCE) && abs(current_roll) <= (target_roll + STABILIZATION_TOLERANCE) && abs(current_pitch) >= (target_pitch - STABILIZATION_TOLERANCE) && abs(current_pitch) <= (target_pitch + STABILIZATION_TOLERANCE))
+
     {
         stabilizing = true;
     }
@@ -190,7 +187,6 @@ void check_stability()
         // Keep stabilizing
     }
 }
-
 
 void update_PID()
 {

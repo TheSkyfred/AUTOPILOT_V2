@@ -21,8 +21,7 @@ const char *FlightModeToString(FlightMode currentMode)
     }
 }
 
-
-const char *NavigationModeToString(NavigationMode currentNavigationMode)
+const char *NavModeToString(NavigationMode currentNavigationMode)
 {
     switch (currentNavigationMode)
     {
@@ -32,6 +31,8 @@ const char *NavigationModeToString(NavigationMode currentNavigationMode)
         return "CORRECTING_HEADING";
     case CORRECTING_ALTITUDE:
         return "CORRECTING_ALTITUDE";
+    case STABILIZING:
+        return "STABILIZING";
     }
 }
 
@@ -49,15 +50,15 @@ const char *NavigationModeToString(NavigationMode currentNavigationMode)
 
   */
 
- /*
- 
-     case STABILIZING:
-        return "STABILIZING";
-    case CORRECTING_HEADING:
-        return "CORRECTING_HEADING";
-    case CORRECTING_ALTITUDE:
-        return "CORRECTING_ALTITUDE";
-        
-    case APPROACH:
-        return "APPROACH";
-        */
+/*
+
+    case STABILIZING:
+       return "STABILIZING";
+   case CORRECTING_HEADING:
+       return "CORRECTING_HEADING";
+   case CORRECTING_ALTITUDE:
+       return "CORRECTING_ALTITUDE";
+
+   case APPROACH:
+       return "APPROACH";
+       */

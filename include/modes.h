@@ -47,7 +47,7 @@ enum NavigationMode
 };
 
 extern NavigationMode currentNavigationMode;
-const char *NavigationModeToString(NavigationMode currentNavigationMode);
+const char *NavModeToString(NavigationMode currentNavigationMode);
 
 
 // Modes pour les virages
