@@ -21,7 +21,7 @@ const int yaw_turn_range = 30;
 const int max_roll_angle = 30;
 
 // HEADING
-const int heading_tolerance = 5;
+const int heading_tolerance = 2;
 
 // BAROMETER
 int altitude_tolerance = 2; // Tolerance in meter
@@ -34,7 +34,7 @@ const int SERVOMIN = SERVOMAX - SERVOMID; // Longueur d'impulsion minimale (0°)
 
 // TAKEOFF
 int takeoff_security_altitude = 40;
-int takeoff_tolerance = 15;
+int takeoff_tolerance = 2;
 
 
 const int ECHO_PIN = 12;
@@ -58,7 +58,7 @@ float landing_altitude = 0.00;
 
 // Stabilization
 const unsigned long STABILIZATION_PERIOD = 3000; // 3 secondes
-const int STABILIZATION_TOLERANCE = 2;
+const int STABILIZATION_TOLERANCE = 4;
 bool isStable = false;
 
 float PID_TAKEOFF[] = {2.5, 0.5, 1.0};
