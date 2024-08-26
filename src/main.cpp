@@ -46,6 +46,11 @@ bool isTurning = false;
 bool isCorrectingAltitude = false;
 float avgDistance = 0;
 
+// Variables pour mesurer la fréquence du loop
+unsigned long startTime = 0;     // Pour enregistrer le temps précédent
+unsigned long endTime = 0;       // Pour enregistrer le temps actuel
+unsigned long executionTime = 0; // Pour enregistrer le temps actuel
+
 void setup()
 {
   Wire.begin();
@@ -84,10 +89,14 @@ void setup()
 
 void loop()
 {
+  startTime = millis();
 
   // update_telemetry();
   update_sensors();
 
+  endTime = millis();
+
+  executionTime = endTime - startTime;
   switch (currentMode)
   {
 
@@ -146,12 +155,14 @@ void loop()
       break;
     }
 
-    // check if current_altitude > home_altitude + 20m
-    else if (current_GPS_altitude > home_point.altitude + takeoff_security_altitude) // REPLACE BY IF !!
-    {
-      currentMode = NAVIGATE; // Go to NAVIGATE Mode
-      break;
-    }
+    /*
+        // check if current_altitude > home_altitude + 20m
+        else if (current_GPS_altitude > home_point.altitude + takeoff_security_altitude) // REPLACE BY IF !!
+        {
+          currentMode = NAVIGATE; // Go to NAVIGATE Mode
+          break;
+        }
+    */
 
     else
     {
@@ -192,8 +203,9 @@ void loop()
         break;
       }
 
-            else if (abs(altitude_error) > altitude_tolerance)
+      else if (abs(altitude_error) > altitude_tolerance)
       {
+        calculate_altitude_factor();
         currentNavigationMode = CORRECTING_ALTITUDE;
         break;
       }
@@ -214,9 +226,37 @@ void loop()
         isTurning = false;
         currentNavigationMode = STABILIZING;
       }
-      else
+
+      switch (currentTurnMode)
       {
-        // TURN HERE
+      case NO_TURN:
+
+        if (abs(heading_error) < yaw_turn_range)
+        {
+          currentTurnMode = YAW_CORRECTION;
+          // We do a yaw_turn
+          break;
+        }
+        else
+        {
+          currentTurnMode = BANKED_TURN;
+          break;
+        }
+
+        break;
+
+      case BANKED_TURN:
+        target_roll = map(heading_error, -180, 180, -max_roll_angle, max_roll_angle);
+        target_pitch = 0;
+        break;
+
+      case YAW_CORRECTION:
+
+        break;
+
+      default:
+        Serial.println("Erreur Turn Mode");
+        break;
       }
 
       break; // END CORRECTING HEADING
@@ -235,6 +275,18 @@ void loop()
       {
         // correct altitude
         target_roll = 0;
+        adjustPitchForAltitude(current_barometer_altitude, target_altitude);
+
+        // Limiter l'angle de pitch pour ne pas dépasser max_pitch_angle
+        if (target_pitch > max_pitch_angle)
+        {
+          target_pitch = max_pitch_angle;
+        }
+        else if (target_pitch < -max_pitch_angle)
+        {
+          target_pitch = -max_pitch_angle;
+        }
+
         //   target_pitch = constrain((target_altitude - current_barometer_altitude), -max_roll_angle, max_roll_angle);
       }
 
@@ -327,11 +379,14 @@ void loop()
 
   // AFFICHAGE :
   unsigned long currentMillis = millis();
+  if (currentMillis - lastPrint >= (PRINT_INTERVAL / 4))
+  {
+    update_screen(); // UPDATE SCREEN
+  }
   if (currentMillis - lastPrint >= PRINT_INTERVAL)
   {
 
     lastPrint = currentMillis;
-    update_screen(); // UPDATE SCREEN
 
     display_DATA(); // UPDATE SERIAL
   }
@@ -339,6 +394,9 @@ void loop()
 
 void display_DATA()
 {
+  Serial.print("Fr: ");
+  Serial.print(executionTime);
+  Serial.print(" Hz-");
   Serial.print("S:");
   Serial.print(stabilized);
 
@@ -346,11 +404,15 @@ void display_DATA()
   Serial.print(FlightModeToString(currentMode));
   Serial.print("- WP:");
   Serial.print(current_waypoint_index);
+
+  Serial.print("- Heading Er:");
+  Serial.print(heading_error);
+  /*
   Serial.print(F(" - t_lat:"));
   Serial.print(target_latitude);
   Serial.print(F(" - t_long:"));
   Serial.print(target_longitude);
-
+*/
   switch (currentMode)
   {
   case INIT:
@@ -412,7 +474,34 @@ void display_DATA()
 
   case NAVIGATE:
     Serial.print(" NavMode: ");
-    Serial.print(NavModeToString(currentNavigationMode)); // CRASH
+    Serial.print(NavModeToString(currentNavigationMode));
+
+    switch (currentNavigationMode)
+    {
+
+    case FLYING:
+      break;
+    case CORRECTING_HEADING:
+      Serial.print("- TurnMode: ");
+      Serial.print(TurnModeToString(currentTurnMode));
+      Serial.print("Heading Error :");
+
+      Serial.print(heading_error);
+
+      break;
+    case CORRECTING_ALTITUDE:
+
+      Serial.print("- Alt Error: ");
+      Serial.print(altitude_error);
+      Serial.print("- K_Alt: ");
+      Serial.print(K_altitude);
+
+      break;
+    case STABILIZING:
+      break;
+
+      break;
+    }
 
     Serial.print(" -TRoll:");
     Serial.print(target_roll);

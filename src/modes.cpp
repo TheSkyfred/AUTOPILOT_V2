@@ -36,6 +36,19 @@ const char *NavModeToString(NavigationMode currentNavigationMode)
     }
 }
 
+const char *TurnModeToString(TurnMode currentTurnMode)
+{
+    switch (currentTurnMode)
+    {
+    case NO_TURN:
+        return "NO_TURN";
+    case BANKED_TURN:
+        return "BANKED_TURN";
+    case YAW_CORRECTION:
+        return "YAW_CORRECTION";
+    }
+}
+
 /*
   INIT,
   ARMED,

@@ -49,6 +49,12 @@ bool yaw_block_condition = 0;
 bool yaw_step_condition = 0;
 float yaw_step_value = 0;
 
+// Altitude corrections
+float StartAltitudeError = 0;
+float StartWaypointDistance = 0;
+float K_altitude = 0;
+float altitudeError = 0;
+
 // Définir des variables pour le PID
 double RollSetpoint, RollInput, RollOutput;
 double PitchSetpoint, PitchInput, PitchOutput;
@@ -211,4 +217,61 @@ void compute_PID()
     rollPID.Compute();
     pitchPID.Compute();
     yawPID.Compute();
+}
+
+void calculate_altitude_factor()
+{
+    StartAltitudeError = target_altitude - current_barometer_altitude;
+    StartWaypointDistance = waypoint_distance;
+}
+
+void adjustPitchForAltitude(float current_barometer_altitude, float target_altitude)
+{
+
+    altitudeError = target_altitude - current_barometer_altitude;
+
+    K_altitude = (altitude_error * waypoint_distance) / (StartAltitudeError * StartWaypointDistance);
+
+
+    // Calculer la correction du pitch proportionnellement à l'erreur d'altitude
+    target_pitch = K_altitude * altitudeError;
+
+    // Ajuster la correction du pitch en fonction de la distance à la cible
+    float transitionFactor;
+
+    /*
+        if (distanceToTarget < endTransitionDistance)
+        {
+            // Réduction progressive de la correction à l'approche de la cible
+            transitionFactor = distanceToTarget / endTransitionDistance;
+        }
+        else if (distanceToTarget < startTransitionDistance)
+        {
+            // Correction progressive au début de la montée ou descente
+            transitionFactor = 1.0 - ((distanceToTarget - endTransitionDistance) / (startTransitionDistance - endTransitionDistance));
+        }
+        else
+        {
+            transitionFactor = 1.0;
+        }
+
+        pitchCorrection *= transitionFactor;
+
+        // Ajuster la correction du pitch en fonction de la direction du mouvement
+        float servoPosition;
+        if (altitudeError > 0)
+        { // Si l'avion doit monter
+            servoPosition = servoMid + pitchCorrection * (servoMax - servoMid);
+        }
+        else
+        { // Si l'avion doit descendre
+            servoPosition = servoMid + pitchCorrection * (servoMid - servoMin);
+        }
+
+        // Conserver la position du servo dans les limites
+        servoPosition = constrain(servoPosition, servoMin, servoMax);
+
+        applyPitchCorrection(servoPosition);
+
+        */
 }

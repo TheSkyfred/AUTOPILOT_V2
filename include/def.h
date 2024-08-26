@@ -59,6 +59,7 @@ extern float roll_step_value, pitch_step_value, yaw_step_value;
 
 extern const int yaw_turn_range;
 extern const int max_roll_angle;
+extern const int max_pitch_angle;
 
 // GPS & CORRECTIONS
 
@@ -85,6 +86,13 @@ extern float current_vectorial_speed;
 // BAROMETER
 extern float current_barometer_altitude;
 extern float barometer_temperature;
+
+
+//Altitude Correction
+
+extern float StartAltitudeError;
+extern float StartWaypointDistance;
+extern float K_altitude;
 
 // TOLERANCE
 extern int altitude_tolerance; // Tolerance in meter

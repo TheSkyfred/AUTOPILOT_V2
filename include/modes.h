@@ -59,6 +59,7 @@ enum TurnMode
 };
 
 extern TurnMode currentTurnMode;
+const char *TurnModeToString(TurnMode currentTurnMode);
 
 enum LandingMode
 {

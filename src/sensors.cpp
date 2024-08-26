@@ -27,6 +27,6 @@ void update_sensors(){
 update_GPS();
 update_barometer();
 update_gyroscope();
-get_sonar();
+//get_sonar();
 
 }

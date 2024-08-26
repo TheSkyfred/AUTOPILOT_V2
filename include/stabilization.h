@@ -34,6 +34,10 @@ void stabilize(
 
 void check_stability();
 
+void calculate_altitude_factor();
+void adjustPitchForAltitude(float current_barometer_altitude, float target_altitude);
+
+
 #endif /* STABILIZATON_H_ */
 
 

@@ -17,8 +17,9 @@ const float safetyMargin = 0.2; // Coefficient de sécurité de 20%
 float buzzer_frequency;
 
 // TURNS
-const int yaw_turn_range = 30;
+const int yaw_turn_range = 15;
 const int max_roll_angle = 30;
+const int max_pitch_angle = 30;
 
 // HEADING
 const int heading_tolerance = 2;

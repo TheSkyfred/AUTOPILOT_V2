@@ -42,8 +42,14 @@ void update_GPS()
                 current_latitude = gps.location.lat();
                 current_longitude = gps.location.lng();
                 satellites = gps.satellites.value();
-                heading_error = TinyGPSPlus::courseTo(current_latitude, current_longitude, target_latitude, target_longitude);
-                target_heading = heading_error;
+                target_heading = TinyGPSPlus::courseTo(current_latitude, current_longitude, target_latitude, target_longitude);
+
+                heading_error = abs(current_heading - target_heading);
+                if (heading_error > 180)
+                    heading_error -= 360;
+                if (heading_error < -180)
+                    heading_error += 360;
+
 
                 waypoint_distance = (unsigned long)TinyGPSPlus::distanceBetween(current_latitude, current_longitude, target_latitude, target_longitude);
             }
@@ -89,7 +95,7 @@ bool GPS_signal()
             hdop = gps.hdop.hdop(); // Obtenir le HDOP en tant que nombre flottant
         }
 
-        if (hdop < 2.00 && gps.location.isValid() && gps.altitude.isValid()) // CHECK HDOP QUALITY
+        if (hdop < 3.00 && gps.location.isValid() && gps.altitude.isValid()) // CHECK HDOP QUALITY
         {
             Serial.println("GPS SIGNAL QUALITY OK");
             Serial.print("HDOP: ");
