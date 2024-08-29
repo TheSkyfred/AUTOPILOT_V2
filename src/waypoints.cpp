@@ -33,15 +33,14 @@ x, y, z: Latitude, longitude et altitude cible pour l'atterrissage.
 
 double lastLatitude = 0.0;
 double lastLongitude = 0.0;
-double totalDistance = 0.0;
 
-unsigned long previousMillis = 0;
 
 // Variables pour les waypoints
 int target_heading = 0;
 double target_latitude = 0;
 double target_longitude = 0;
 double target_altitude = 0;
+double totalDistance = 0;
 
 int current_waypoint_index = 1; // On démarre au point #1 car le zéro est le home_point
 
@@ -69,7 +68,6 @@ void update_waypoints()
     current_GPS[1] = current_longitude;
     current_GPS[2] = current_GPS_altitude;
     */
-
 
     // Récupère les valeurs du waypoint actuel
     Waypoint current_wayppoint = getCurrentWaypoint();
@@ -99,13 +97,14 @@ double calculateTotalDistance()
     }
 
     // Ajouter la distance entre le dernier waypoint et l'atterrissage
-   // totalDistance += calculateDistance(previousPoint.latitude, previousPoint.longitude, landing_point.latitude, landing_point.longitude); //Fonction à supprimer
+    // totalDistance += calculateDistance(previousPoint.latitude, previousPoint.longitude, landing_point.latitude, landing_point.longitude); //Fonction à supprimer
     Serial.print("Total Distance : ");
     Serial.print(totalDistance);
     Serial.println(" m ");
     return totalDistance;
 }
 
+/*
 double calculateDistance(double lat1, double lon1, double lat2, double lon2)
 {
 
@@ -117,7 +116,7 @@ double calculateDistance(double lat1, double lon1, double lat2, double lon2)
     double c = 2 * atan2(sqrt(a), sqrt(1 - a));
     return R * c;
 }
-
+*/
 double degreesToRadians(double degrees)
 {
     return degrees * (myPI / 180.0);
@@ -133,7 +132,6 @@ Waypoint getCurrentWaypoint()
     {
         Serial.println("Erreur dans la gestion des Waypoints");
         return {0, 0, 0}; // Erreur: retourne un waypoint vide si l'index est hors de portée
-
     }
 }
 
@@ -151,7 +149,13 @@ void next_waypoint()
     }
 }
 
-//Useless function for landing Point - I'll see if I can do something with it
+void goToLanding()
+{
+    Serial.println("GOING TO APPROACH POINT FOR LANDING");
+    //current_waypoint_index = 0; // LANDING WP
+}
+
+// Useless function for landing Point - I'll see if I can do something with it
 void updateLandingPoint()
 {
     if (numWaypoints > 0)

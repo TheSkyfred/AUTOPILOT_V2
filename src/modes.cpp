@@ -33,6 +33,8 @@ const char *NavModeToString(NavigationMode currentNavigationMode)
         return "CORRECTING_ALTITUDE";
     case STABILIZING:
         return "STABILIZING";
+    case RECOVERY:
+        return "RECOVERY";
     }
 }
 

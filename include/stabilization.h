@@ -37,6 +37,9 @@ void check_stability();
 void calculate_altitude_factor();
 void adjustPitchForAltitude(float current_barometer_altitude, float target_altitude);
 
+double updateRollAngleRequest(double prev_roll_correction, double target_roll);
+double updatePitchAngleRequest(double prev_pitch_correction, double target_pitch);
+
 
 #endif /* STABILIZATON_H_ */
 

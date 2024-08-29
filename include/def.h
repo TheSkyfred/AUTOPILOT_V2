@@ -7,7 +7,7 @@ extern const double myPI;
 
 extern bool stabilized;
 
-extern int current_heading;
+extern double current_heading;
 extern int target_heading;
 
 extern double target_latitude;
@@ -17,7 +17,7 @@ extern double target_speed;
 
 extern int currentWPIndex;
 
-extern float roll_correction, pitch_correction, yaw_correction;
+extern double roll_correction, pitch_correction, yaw_correction;
 
 // SPEED
 extern float speed_min;
@@ -30,8 +30,8 @@ extern int takeoff_angle;
 extern int takeoff_security_altitude;
 // GYROSCOPE
 
-extern int current_roll, current_pitch, current_yaw;
-extern int target_roll, target_pitch, target_yaw;
+extern double current_roll, current_pitch, current_yaw;
+extern double target_roll, target_pitch, target_yaw;
 
 // LANDING
 extern float landing_altitude;
@@ -39,6 +39,14 @@ extern float landing_altitude;
 // BATTERY
 extern const float V_MIN;
 extern const float V_MAX;
+extern const long batteryCheckInterval;
+
+// PID
+extern float PID_TAKEOFF[], PID_NAVIGATE[], PID_LANDING[];
+
+
+//BATTERY 
+extern const float safetyBatteryMargin;
 
 // BUZZER
 extern float buzzer_frequency;
@@ -53,13 +61,16 @@ extern double RollInput, RollOutput, RollSetpoint, rollKp, rollKi, rollKd;
 extern double PitchInput, PitchOutput, PitchSetpoint, pitchKp, pitchKi, pitchKd;
 extern double YawInput, YawOutput, YawSetpoint, yawKp, yawKi, yawKd;
 extern bool roll_block_condition, pitch_block_condition, yaw_block_condition;
-extern float roll_correction, pitch_correction, yaw_correction;
+extern double roll_correction, pitch_correction, yaw_correction;
 extern bool roll_step_condition, pitch_step_condition, yaw_step_condition;
 extern float roll_step_value, pitch_step_value, yaw_step_value;
 
 extern const int yaw_turn_range;
 extern const int max_roll_angle;
 extern const int max_pitch_angle;
+
+extern const int roll_tolerance;
+extern const int pitch_tolerance;
 
 // GPS & CORRECTIONS
 
@@ -87,8 +98,7 @@ extern float current_vectorial_speed;
 extern float current_barometer_altitude;
 extern float barometer_temperature;
 
-
-//Altitude Correction
+// Altitude Correction
 
 extern float StartAltitudeError;
 extern float StartWaypointDistance;
@@ -118,7 +128,7 @@ typedef struct struct_message
   float current_GPS_altitude;
   float current_barometer_altitude;
   double current_GPS_speed;
-  int current_Heading;
+  double current_Heading;
   int current_roll;
   int current_pitch;
   int current_yaw;
@@ -139,10 +149,11 @@ typedef struct Waypoint
 
 extern Waypoint waypointData[];
 extern Waypoint home_point;
+extern Waypoint landing_point;
 extern int numWaypoints;
 extern int current_waypoint_index;
 
 // DISTANCE
-extern double totalDistance;
+extern double traveledDistance;
 
 #endif /* DEF_H_ */

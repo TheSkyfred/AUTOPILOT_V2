@@ -7,6 +7,7 @@
 
 #include "mySerial.h"
 #include "waypoints.h"
+#include "navigation.h"
 
 #include "modes.h"
 
@@ -14,12 +15,18 @@
 
 TinyGPSPlus gps;
 
+
 double current_latitude = 0.0;
 double current_longitude = 0.0;
 double current_GPS_altitude = 0.0;
 double current_GPS_speed = 0.0;
 
 int heading_error = 0;
+
+double last_latitude = 0.0;
+double last_longitude = 0.0;
+double traveledDistance = 0.0;
+
 unsigned long waypoint_distance = 0;
 
 int satellites = 0;
@@ -49,6 +56,11 @@ void update_GPS()
                     heading_error -= 360;
                 if (heading_error < -180)
                     heading_error += 360;
+
+
+
+    heading_error = normalizeHeading(target_heading - current_heading);
+
 
 
                 waypoint_distance = (unsigned long)TinyGPSPlus::distanceBetween(current_latitude, current_longitude, target_latitude, target_longitude);
@@ -136,3 +148,18 @@ void GPS_set_home()
     Serial.print("Altitude: ");
     Serial.println(waypointData[0].altitude);
 };
+
+
+
+void updateTraveledDistance() {
+  if (gps.location.isUpdated()) {
+
+    if (last_latitude != 0.0 && last_longitude != 0.0) {
+      traveledDistance +=  TinyGPSPlus::courseTo(last_latitude, last_longitude, current_latitude, current_longitude);
+ 
+    }
+
+    last_latitude = current_latitude;
+    last_longitude = current_longitude;
+  }
+}

@@ -46,6 +46,10 @@ bool isTurning = false;
 bool isCorrectingAltitude = false;
 float avgDistance = 0;
 
+// BATTERY:
+unsigned long previousMillis = 0;
+unsigned long lastBatteryCheckMillis = 0; // Temps du dernier contrôle de batterie
+
 // Variables pour mesurer la fréquence du loop
 unsigned long startTime = 0;     // Pour enregistrer le temps précédent
 unsigned long endTime = 0;       // Pour enregistrer le temps actuel
@@ -81,7 +85,6 @@ void setup()
   init_buzzer();
   delay(2000);
 
-  // battery_initial_check();
   init_PID();
 
   GPS_signal();
@@ -90,6 +93,7 @@ void setup()
 void loop()
 {
   startTime = millis();
+  unsigned long currentMillis = millis();
 
   // update_telemetry();
   update_sensors();
@@ -107,6 +111,8 @@ void loop()
 
     calculateTotalDistance(); // Calculer la distance totale (optionnel)
     check_altitude();
+
+    battery_initial_check(); // See to do this only one time
 
     currentMode = ARMED; // Passer en mode ARMED
 
@@ -183,6 +189,14 @@ void loop()
     {
 
     case FLYING:
+      updateTraveledDistance(); //See if we do this only during FLYING mode or during Navigate Mode
+
+      // Vérifier la batterie toutes les minutes
+      if (currentMillis - lastBatteryCheckMillis >= batteryCheckInterval)
+      {
+        lastBatteryCheckMillis = currentMillis;
+        battery_check();
+      }
 
       if (isTurning)
       {
@@ -246,6 +260,7 @@ void loop()
         break;
 
       case BANKED_TURN:
+
         target_roll = map(heading_error, -180, 180, -max_roll_angle, max_roll_angle);
         target_pitch = 0;
         break;
@@ -378,15 +393,15 @@ void loop()
   } // End Switch Main Mode
 
   // AFFICHAGE :
-  unsigned long currentMillis = millis();
-  if (currentMillis - lastPrint >= (PRINT_INTERVAL / 4))
+  unsigned long currentBatteryMillis = millis();
+  if (currentBatteryMillis - lastPrint >= (PRINT_INTERVAL / 4))
   {
     update_screen(); // UPDATE SCREEN
   }
-  if (currentMillis - lastPrint >= PRINT_INTERVAL)
+  if (currentBatteryMillis - lastPrint >= PRINT_INTERVAL)
   {
 
-    lastPrint = currentMillis;
+    lastPrint = currentBatteryMillis;
 
     display_DATA(); // UPDATE SERIAL
   }

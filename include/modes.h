@@ -44,6 +44,7 @@ enum NavigationMode
   STABILIZING,
   CORRECTING_HEADING,
   CORRECTING_ALTITUDE,
+  RECOVERY,
 };
 
 extern NavigationMode currentNavigationMode;

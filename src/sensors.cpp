@@ -2,6 +2,7 @@
 #include "sensors.h"
 
 #include "GPS.h"
+#include "battery.h"
 #include "barometer.h"
 #include "gyroscope.h"
 #include "myDriver.h"
@@ -11,6 +12,8 @@
 
 void init_sensors(){
 init_GPS();
+delay(200);
+init_battery();
 delay(200);
 init_barometer();
 delay(200);

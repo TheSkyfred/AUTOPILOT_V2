@@ -9,11 +9,12 @@
 #include "config.h"
 #include "GPS.h"
 
+#include "myDriver.h"
+
 // PID
-//  Définir les paramètres de réglage du PID pour le roulis et le tangage
-double rollKp = 1.03, rollKi = 0.000, rollKd = 2.0003;
-double pitchKp = 1.02, pitchKi = 0.000, pitchKd = 2.0002;
-double yawKp = 1.025, yawKi = 0.000, yawKd = 0.0002;
+double rollKp = 0, rollKi = 0.000, rollKd = 0.0;
+double pitchKp = 0.0, pitchKi = 0.000, pitchKd = 0.0;
+double yawKp = 0.0, yawKi = 0.000, yawKd = 0.0;
 
 // KALMANFILTER
 extern SimpleKalmanFilter xKalmanFilter;
@@ -21,9 +22,9 @@ extern SimpleKalmanFilter yKalmanFilter;
 extern SimpleKalmanFilter zKalmanFilter;
 
 // Variables pour l'orientation actuelle basée sur l'IMU
-int target_roll = 0;
-int target_pitch = 0;
-int target_yaw = 0;
+double target_roll = 0;
+double target_pitch = 0;
+double target_yaw = 0;
 
 int prev_roll_correction = 0;
 int prev_pitch_correction = 0;
@@ -35,9 +36,9 @@ int gyro_pitch_input, gyro_roll_input;
 int pitch_output, roll_output;
 
 // Corrections
-float roll_correction = 0;
-float pitch_correction = 0;
-float yaw_correction = 0;
+double roll_correction = 0;
+double pitch_correction = 0;
+double yaw_correction = 0;
 
 bool roll_block_condition = 0;
 bool roll_step_condition = 0;
@@ -61,9 +62,9 @@ double PitchSetpoint, PitchInput, PitchOutput;
 double YawSetpoint, YawInput, YawOutput;
 
 // Objets PID avec entrées et sorties en tant que pointeurs
-PID rollPID(&RollInput, &RollOutput, &RollSetpoint, rollKp, rollKi, rollKd, DIRECT);
-PID pitchPID(&PitchInput, &PitchOutput, &PitchSetpoint, pitchKp, pitchKi, pitchKd, DIRECT);
-PID yawPID(&YawInput, &YawOutput, &YawSetpoint, yawKp, yawKi, yawKd, DIRECT);
+PID rollPID(&current_roll, &roll_correction, &target_roll, rollKp, rollKi, rollKd, DIRECT);
+PID pitchPID(&current_pitch, &pitch_correction, &target_pitch, pitchKp, pitchKi, pitchKd, DIRECT);
+PID yawPID(&YawInput, &yaw_correction, &target_yaw, yawKp, yawKi, yawKd, DIRECT);
 
 void init_PID()
 {
@@ -91,7 +92,6 @@ void stabilize(
     float yaw_step_value)
 {
     update_PID();
-    compute_PID();
 
     if (roll_block_condition)
     {
@@ -108,45 +108,30 @@ void stabilize(
         yaw_correction = SERVOMID;
     }
 
-    if (roll_step_condition)
+    // RECOVERY :
+    if (abs(current_roll - prev_roll_correction) > roll_tolerance || abs(current_pitch - prev_pitch_correction > pitch_tolerance))
     {
-        if (current_roll == prev_roll_correction)
-        {
-            roll_correction += roll_step_value;
-        }
-
-        else
-        {
-            roll_correction = prev_roll_correction;
-        }
+        currentNavigationMode = RECOVERY;
+        //  currentRecorveryMode = ZeroStabilize;
     }
+    else
+    { // CORRECTION WITH STEP :
 
-    if (pitch_step_condition)
-    {
-        if (current_pitch == prev_pitch_correction)
+        if (roll_step_condition && (current_roll - prev_roll_correction) < 1)
         {
-
-            pitch_correction += pitch_step_value;
+            // Si l'inclinaison précédente a été atteinte, on met à jour l'inclinaison demandée
+            prev_roll_correction = updateRollAngleRequest(prev_roll_correction, target_roll);
         }
 
-        else
+        if (pitch_step_condition && (current_roll - prev_roll_correction) < 1)
         {
-            pitch_correction = prev_pitch_correction;
-        }
-    }
-
-    if (yaw_step_condition)
-    {
-        if (current_yaw == prev_yaw_correction)
-        {
-
-            yaw_correction += yaw_step_value;
+            // Si l'inclinaison précédente a été atteinte, on met à jour l'inclinaison demandée
+            prev_roll_correction = updatePitchAngleRequest(prev_pitch_correction, target_pitch);
         }
 
-        else
-        {
-            yaw_correction = prev_yaw_correction;
-        }
+        compute_PID();
+
+        set_servos(roll_correction, pitch_correction, yaw_correction);
     }
 };
 
@@ -194,8 +179,42 @@ void check_stability()
     }
 }
 
-void update_PID()
+void update_PID() // UPDATE PID ACCORDING TO THE CURRENT MODE
 {
+
+    switch (currentNavigationMode)
+    {
+    case TAKEOFF:
+
+        rollKp = PID_TAKEOFF[0];
+        rollKi = PID_TAKEOFF[1];
+        rollKd = PID_TAKEOFF[2];
+
+        break;
+
+    case NAVIGATE:
+
+        rollKp = PID_NAVIGATE[0];
+        rollKi = PID_NAVIGATE[1];
+        rollKd = PID_NAVIGATE[2];
+
+        break;
+
+    case LANDING:
+
+        rollKp = PID_LANDING[0];
+        rollKi = PID_LANDING[1];
+        rollKd = PID_LANDING[2];
+
+        break;
+
+    default:
+
+        Serial.println("Erreur dans les modes de PID");
+
+        break;
+    }
+
     // Mise à jour des PID. A placer dans le loop si MAJ en cours de vol
     rollPID.SetTunings(rollKp, rollKi, rollKd);
     pitchPID.SetTunings(pitchKp, pitchKi, pitchKd);
@@ -208,8 +227,6 @@ void compute_PID()
     PitchInput = current_pitch;
     YawInput = current_heading;
 
-    PitchSetpoint = current_pitch;
-
     RollSetpoint = target_roll;
     PitchSetpoint = target_pitch;
     YawSetpoint = target_yaw;
@@ -218,6 +235,46 @@ void compute_PID()
     pitchPID.Compute();
     yawPID.Compute();
 }
+
+void adjustRollForHeading()
+{
+}
+
+// Fonction pour mettre à jour la demande d'inclinaison degré par degré
+double updateRollAngleRequest(double prev_roll_correction, double target_roll)
+{
+    if (target_roll > prev_roll_correction)
+    {
+        return prev_roll_correction + roll_step_value; // Incliner d'un degré vers le haut
+    }
+    else if (target_roll < prev_roll_correction)
+    {
+        return prev_roll_correction - roll_step_value; // Incliner d'un degré vers le bas
+    }
+    else
+    {
+        return prev_roll_correction; // Pas de changement
+    }
+}
+
+// Fonction pour mettre à jour la demande d'inclinaison degré par degré
+double updatePitchAngleRequest(double prev_pitch_correction, double target_pitch)
+{
+    if (target_pitch > prev_pitch_correction)
+    {
+        return prev_pitch_correction + pitch_step_value; // Incliner d'un degré vers le haut
+    }
+    else if (target_pitch < prev_pitch_correction)
+    {
+        return target_pitch - pitch_step_value; // Incliner d'un degré vers le bas
+    }
+    else
+    {
+        return prev_pitch_correction; // Pas de changement
+    }
+}
+
+/////////////// ALTITUDE ///////////////
 
 void calculate_altitude_factor()
 {
@@ -232,20 +289,16 @@ void adjustPitchForAltitude(float current_barometer_altitude, float target_altit
 
     K_altitude = (altitude_error * waypoint_distance) / (StartAltitudeError * StartWaypointDistance);
 
-
     // Calculer la correction du pitch proportionnellement à l'erreur d'altitude
     target_pitch = K_altitude * altitudeError;
-
-    // Ajuster la correction du pitch en fonction de la distance à la cible
-    float transitionFactor;
 
     /*
         if (distanceToTarget < endTransitionDistance)
         {
             // Réduction progressive de la correction à l'approche de la cible
-            transitionFactor = distanceToTarget / endTransitionDistance;
+            transitionFactor = waypoint_distance / endTransitionDistance;
         }
-        else if (distanceToTarget < startTransitionDistance)
+        else if (waypoint_distance < startTransitionDistance)
         {
             // Correction progressive au début de la montée ou descente
             transitionFactor = 1.0 - ((distanceToTarget - endTransitionDistance) / (startTransitionDistance - endTransitionDistance));

@@ -10,8 +10,10 @@ int langing_angle = 10;
 // Paramètres de la batterie
 const float V_MIN = 10.2; // Tension minimale en Volts
 const float V_MAX = 12.6; // Tension pleine charge en Volts
+
 // Paramètres de mesure
-const float safetyMargin = 0.2; // Coefficient de sécurité de 20%
+const float safetyBatteryMargin = 0.2; // Coefficient de sécurité de 20%
+const long batteryCheckInterval = 60*1000; // Intervalle de vérification de la batterie en millisecondes (60 secondes)
 
 //BUZZER
 float buzzer_frequency;
@@ -20,6 +22,9 @@ float buzzer_frequency;
 const int yaw_turn_range = 15;
 const int max_roll_angle = 30;
 const int max_pitch_angle = 30;
+const int roll_tolerance = 5;
+const int pitch_tolerance = 5;
+
 
 // HEADING
 const int heading_tolerance = 2;
@@ -65,6 +70,17 @@ bool isStable = false;
 float PID_TAKEOFF[] = {2.5, 0.5, 1.0};
 float PID_NAVIGATE[] = {1.5, 1.0, 0.5};
 float PID_LANDING[] = {1.0, 0.8, 0.3};
+
+
+
+/*
+//  Définir les paramètres de réglage du PID pour le roulis et le tangage
+double rollKp = 1.03, rollKi = 0.000, rollKd = 2.0003;
+double pitchKp = 1.02, pitchKi = 0.000, pitchKd = 2.0002;
+double yawKp = 1.025, yawKi = 0.000, yawKd = 0.0002;
+*/
+
+
 
 //SONAR
 int num_samples = 10; // Nombre de mesures pour la moyenne du sonar

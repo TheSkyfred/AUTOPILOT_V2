@@ -13,6 +13,8 @@ double last_altitude_gps = 0.0;
 double last_horizontal_speed = 0.0;
 float current_time = 0.0;
 
+
+
 // Calculer la variation d'altitude pour les deux capteurs
 double delta_altitude_bme = current_barometer_altitude- last_altitude_bme;
 double delta_altitude_gps = current_GPS_altitude - last_altitude_gps;
@@ -28,6 +30,7 @@ double vertical_speed_gps = delta_altitude_gps / delta_time;
 // Calculer la vitesse vectorielle totale
 double total_speed_bme = sqrt(pow(current_GPS_speed, 2) + pow(vertical_speed_bme, 2));
 double total_speed_gps = sqrt(pow(current_GPS_speed, 2) + pow(vertical_speed_gps, 2));
+
 
 // VERTICAL SPEED FROM BME280
 void calculate_vertical_speed()
@@ -56,3 +59,18 @@ void calculate_vertical_speed()
 float calculate_vectorial_speed(float current_GPS_speed_meters, float vertical_speed_bme) {
   return sqrt(pow(current_GPS_speed_meters, 2) + pow(vertical_speed_bme, 2));
 }
+
+
+
+
+// Fonction pour normaliser l'erreur de cap entre -180 et 180 degrés
+double normalizeHeading(double heading) {
+  if (heading > 180.0) {
+    heading -= 360.0;
+  } else if (heading < -180.0) {
+    heading += 360.0;
+  }
+  return heading;
+}
+
+

@@ -17,12 +17,12 @@ uint16_t BNO055_SAMPLERATE_DELAY_MS = 10;
 //                                   id, address
 Adafruit_BNO055 bno = Adafruit_BNO055(55, gyroscope_address, &Wire);
 
-int current_pitch = 0;
-int current_roll = 0;
-int current_yaw = 0;
+double current_pitch = 0;
+double current_roll = 0;
+double current_yaw = 0;
 
 float heading = 0;
-int current_heading = 0;
+double current_heading = 0;
 
 void init_gyroscope()
 {
