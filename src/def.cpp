@@ -87,3 +87,6 @@ int num_samples = 10; // Nombre de mesures pour la moyenne du sonar
 
 //DISTANCE
 //double totalDistance = 0;
+
+
+//TELEMETRY

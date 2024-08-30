@@ -8,6 +8,8 @@ const char *FlightModeToString(FlightMode currentMode)
     {
     case INIT:
         return "INIT";
+    case DISARMED:
+        return "DISARMED";
     case ARMED:
         return "ARMED";
     case TAKEOFF:

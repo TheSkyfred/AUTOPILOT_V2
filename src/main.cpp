@@ -34,6 +34,9 @@
 #include "myDriver.h"
 #include "waypoints.h"
 
+#include <EEPROM.h>  // Bibliothèque pour gérer l'EEPROM
+
+
 FlightMode currentMode = INIT;
 EngineStatus currentEngineStatus = ENGINE_OFF;
 SpeedMode currentSpeedMode = COEFFICIENT_CALC;
@@ -57,6 +60,13 @@ unsigned long executionTime = 0; // Pour enregistrer le temps actuel
 
 void setup()
 {
+
+      // Initialiser l'EEPROM
+    EEPROM.begin(EEPROM_SIZE);
+
+    // Charger les paramètres de l'EEPROM
+    EEPROM.get(0, MLWaypoints);
+
   Wire.begin();
   Wire.setClock(400000); // Définir le taux de données I2C à 400 kHz
 
@@ -101,6 +111,15 @@ void loop()
   endTime = millis();
 
   executionTime = endTime - startTime;
+
+
+    static unsigned long last_heartbeat = 0;
+    // Envoyer périodiquement des messages HEARTBEAT pour indiquer que le système est actif
+    if (millis() - last_heartbeat > TELEMETRY_INTERVAL) {
+        sendHeartbeat();
+        last_heartbeat = millis();
+    }
+
   switch (currentMode)
   {
 

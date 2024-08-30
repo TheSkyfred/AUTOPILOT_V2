@@ -1,7 +1,8 @@
 #ifndef DEF_H_
 #define DEF_H_
 
-#define SerialMonitor
+#include <stdint.h> 
+
 
 extern const double myPI;
 
@@ -140,20 +141,45 @@ typedef struct struct_message
 extern struct_message sentData;
 
 // Points de la mission
-typedef struct Waypoint
+typedef struct EEPROM_Waypoint
 {
   double latitude;
   double longitude;
   double altitude;
-} Waypoint;
+} EEPROM_Waypoint;
 
-extern Waypoint waypointData[];
-extern Waypoint home_point;
-extern Waypoint landing_point;
+extern EEPROM_Waypoint waypointData[];
+extern EEPROM_Waypoint home_point;
+extern EEPROM_Waypoint landing_point;
 extern int numWaypoints;
 extern int current_waypoint_index;
 
 // DISTANCE
 extern double traveledDistance;
+
+
+
+// Structure pour stocker les informations des waypoints
+struct MavLinkWayPoint
+{
+  float param1;
+  float param2;
+  float param3;
+  float param4;
+  int32_t x; // Latitude
+  int32_t y; // Longitude
+  float z;   // Altitude
+  uint16_t seq;
+  uint16_t command;
+  uint8_t target_system;
+  uint8_t target_component;
+  uint8_t frame;
+  uint8_t current;
+  uint8_t autocontinue;
+  uint8_t mission_type;
+};
+
+extern MavLinkWayPoint MLWaypoints[100];
+
 
 #endif /* DEF_H_ */

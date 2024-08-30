@@ -31,9 +31,13 @@ x, y, z: Latitude, longitude et altitude cible pour l'atterrissage.
 #include "math.h"
 #include "GPS.h"
 
+#include <EEPROM.h>  // Bibliothèque pour gérer l'EEPROM
+
+MavLinkWayPoint MLWaypoints[100];
+
+
 double lastLatitude = 0.0;
 double lastLongitude = 0.0;
-
 
 // Variables pour les waypoints
 int target_heading = 0;
@@ -48,10 +52,10 @@ int current_waypoint_index = 1; // On démarre au point #1 car le zéro est le h
 float current_GPS[] = {0, 0, 0};
 double target_GPS[] = {0, 0, 0}; // GPS cible
 
-Waypoint home_point = {0, 0, 0};                                     // Coordonnées de départ
-Waypoint landing_point = {43.60457449936099, 3.8257937902755703, 0}; // Point d'atterrissage
+EEPROM_Waypoint home_point = {0, 0, 0};    // Coordonnées de départ
+EEPROM_Waypoint landing_point = {0, 0, 0}; // Point d'atterrissage
 
-Waypoint waypointData[] = {
+EEPROM_Waypoint waypointData[] = {
     {0, 0, 0}, // point HOME
     {43.61327522970758, 3.843247992486303, 40},
     {43.61384303201776, 3.8317396672563824, 40},
@@ -70,7 +74,7 @@ void update_waypoints()
     */
 
     // Récupère les valeurs du waypoint actuel
-    Waypoint current_wayppoint = getCurrentWaypoint();
+    EEPROM_Waypoint current_wayppoint = getCurrentWaypoint();
 
     // Met à jour les cibles GPS avec les valeurs correctes
     target_latitude = current_wayppoint.latitude;   // Latitude cible
@@ -84,45 +88,27 @@ void update_waypoints()
 double calculateTotalDistance()
 {
 
-    Waypoint previousPoint = home_point;
+    EEPROM_Waypoint previousPoint = home_point;
 
     // Ajouter la distance entre chaque waypoint
     for (int i = 0; i < numWaypoints; i++)
     {
-        //  totalDistance += calculateDistance(previousPoint.latitude, previousPoint.longitude, waypointData[i].latitude, waypointData[i].longitude);
-
         totalDistance += (unsigned long)TinyGPSPlus::distanceBetween(previousPoint.latitude, previousPoint.longitude, waypointData[i].latitude, waypointData[i].longitude);
-
         previousPoint = waypointData[i];
     }
 
-    // Ajouter la distance entre le dernier waypoint et l'atterrissage
-    // totalDistance += calculateDistance(previousPoint.latitude, previousPoint.longitude, landing_point.latitude, landing_point.longitude); //Fonction à supprimer
     Serial.print("Total Distance : ");
     Serial.print(totalDistance);
     Serial.println(" m ");
     return totalDistance;
 }
 
-/*
-double calculateDistance(double lat1, double lon1, double lat2, double lon2)
-{
-
-    const double R = 6371000; // Rayon de la Terre en mètres
-    double dLat = degreesToRadians(lat2 - lat1);
-    double dLon = degreesToRadians(lon2 - lon1);
-    double a = sin(dLat / 2) * sin(dLat / 2) +
-               sin(dLon / 2) * sin(dLon / 2) * cos(degreesToRadians(lat1)) * cos(degreesToRadians(lat2));
-    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-    return R * c;
-}
-*/
 double degreesToRadians(double degrees)
 {
     return degrees * (myPI / 180.0);
 }
 
-Waypoint getCurrentWaypoint()
+EEPROM_Waypoint getCurrentWaypoint()
 {
     if (current_waypoint_index >= 0 && current_waypoint_index < numWaypoints)
     {
@@ -152,7 +138,7 @@ void next_waypoint()
 void goToLanding()
 {
     Serial.println("GOING TO APPROACH POINT FOR LANDING");
-    //current_waypoint_index = 0; // LANDING WP
+    // current_waypoint_index = 0; // LANDING WP
 }
 
 // Useless function for landing Point - I'll see if I can do something with it
@@ -177,4 +163,22 @@ void updateLandingPoint()
     {
         Serial.println("Aucun waypoint dans la liste pour mettre à jour le point d'atterrissage.");
     }
+}
+
+
+
+
+// Enregistrer un waypoint dans l'EEPROM
+void saveWaypointToEEPROM(const MavLinkWayPoint& MLWaypoints) {
+    int address = sizeof(MLWaypoints) + MLWaypoints.seq * sizeof(MavLinkWayPoint);
+    EEPROM.put(address, MLWaypoints);
+    EEPROM.commit();
+}
+
+// Charger un waypoint depuis l'EEPROM
+EEPROM_Waypoint loadWaypointFromEEPROM(uint16_t seq) {
+    int address = sizeof(MLWaypoints) + seq * sizeof(MavLinkWayPoint);
+    EEPROM_Waypoint current_ML_waypoint;
+    EEPROM.get(address, current_ML_waypoint);
+    return current_ML_waypoint;
 }

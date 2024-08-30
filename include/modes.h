@@ -7,6 +7,7 @@
 enum FlightMode
 {
   INIT,
+  DISARMED,
   ARMED,
   TAKEOFF,
   CALIBRATE_SPEED,

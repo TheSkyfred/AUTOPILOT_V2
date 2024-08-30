@@ -1,6 +1,12 @@
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
+#define SerialMonitor
+
+
+#define EEPROM_SIZE 4096  // Taille de l'EEPROM (ESP32 a jusqu'à 4096 octets)
+
+
 // SONAR
 #define MYBLUETOOTH false
 #define ESPNOW true
@@ -20,6 +26,9 @@
 #define GPS_BAUDRATE 9600 // The default baudrate of NEO-6M is 9600
 // SERIAL
 #define PRINT_INTERVAL 1000 // Interval in milliseconds
+
+#define TELEMETRY_INTERVAL 1000
+
 
 #define TFT_CS 15
 #define TFT_RST 2 // Vous pouvez aussi utiliser -1 si le pin de reset n'est pas connecté
