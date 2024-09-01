@@ -1,8 +1,10 @@
 #ifndef MYSERIAL_H_
 #define MYSERIAL_H_
 
-#include "config.h"
 #include "def.h"
+
+#include <HardwareSerial.h>
+#include "config.h"
 
 
 void init_Serial();

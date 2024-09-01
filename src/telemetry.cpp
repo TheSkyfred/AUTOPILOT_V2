@@ -43,15 +43,30 @@ uint8_t RxMACaddress[] = {0x7D, 0x9E, 0xBD, 0xD9, 0xA0, 0xFD};
 
 ////////// MAVLINK //////////
 
+MAVLinkMessageStructure MavLinkMessageData;
+
 // Configuration MAVLink
 uint8_t system_id = MAV_TYPE_FIXED_WING;
 uint8_t component_id = MAV_COMP_ID_AUTOPILOT1;
+uint8_t autopilot = MAV_AUTOPILOT_GENERIC;
+uint8_t system_status = MAV_STATE_STANDBY;               // MAV_STATE_ACTIVE;
+uint16_t base_mode = MAV_MODE_FLAG_MANUAL_INPUT_ENABLED; // MAV_MODE_AUTO_ARMED
+uint32_t custom_mode = 0;
+
 uint16_t mission_count = 0;
+
 mavlink_mission_item_t mission_items[100];
 mavlink_message_t msg;
 mavlink_status_t status; // Declaration of status
 uint8_t packetSize;
 uint8_t buffer[MAVLINK_MAX_PACKET_LEN];
+
+// Derniers temps d'envoi pour chaque type de message
+unsigned long lastGlobalPositionSend = 0;
+unsigned long lastHeartbeatSend = 0;
+unsigned long lastBatteryStatusSend = 0;
+unsigned long lastMissionStatusSend = 0;
+unsigned long lastAttitudeSend = 0;
 
 void init_telemetry()
 {
@@ -115,14 +130,10 @@ void onDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
 // USELESS FUNCTION
 void Telemetry_update()
 {
-  //-------------------------------------------------------------------------------------
-  esp_err_t result = esp_now_send(RxMACaddress, (uint8_t *)&sentData, sizeof(sentData));
-  //-------------------------------------------------------------------------------------
-  if (result == ESP_OK)
-    Serial.println("Sent with success");
-  else
-    Serial.println("Error sending the data");
-  //-------------------------------------------------------------------------------------
+  // Mettre à jour les données MAVLink_Message avec les valeurs actuelles du capteur et du système
+  updateFlightData(MavLinkMessageData);
+  // Preparer le message MAVLINK à envoyer et l'envoyer
+  PrepareMavlinkMessage(MavLinkMessageData);
 }
 
 // Callback function that will be executed when data is sent
@@ -138,7 +149,7 @@ void handleMavlinkMessage(mavlink_message_t &msg)
   switch (msg.msgid)
   {
   case MAVLINK_MSG_ID_HEARTBEAT:
-    Serial.println("Received HEARTBEAT");
+    // Serial.println("Received HEARTBEAT");
     break;
 
   case MAVLINK_MSG_ID_MISSION_COUNT:
@@ -146,7 +157,7 @@ void handleMavlinkMessage(mavlink_message_t &msg)
     mavlink_mission_count_t mission_count_msg;
     mavlink_msg_mission_count_decode(&msg, &mission_count_msg);
     mission_count = mission_count_msg.count;
-    Serial.println("WP Count : ");
+    Serial.println("WayPoints Count : ");
     Serial.println(mission_count_msg.count);
 
     // Envoyer une requête pour le premier waypoint
@@ -260,25 +271,137 @@ void handleMavlinkMessage(mavlink_message_t &msg)
   }
 }
 
-// Envoyer un message HEARTBEAT
-void sendHeartbeat()
+void updateFlightData(MAVLinkMessageStructure &MavLinkMessageData)
 {
-  mavlink_message_t msg;
+  MavLinkMessageData.time_boot_ms = millis();
+  MavLinkMessageData.lat = current_latitude;           // Latitude en degrés * 1E7
+  MavLinkMessageData.lon = current_longitude;          // Longitude en degrés * 1E7
+  MavLinkMessageData.alt = current_barometer_altitude; // Altitude en millimètres
+  MavLinkMessageData.relative_alt = 0;
+  MavLinkMessageData.vx = 0; // Vitesse dans l'axe X en cm/s
+  MavLinkMessageData.vy = 0;
+  MavLinkMessageData.vz = 0;
+  MavLinkMessageData.hdg = current_heading; // Cap en centi-degrés
+
+  // Attitude
+  MavLinkMessageData.roll = current_radian_roll;   // Roulis en radians
+  MavLinkMessageData.pitch = current_radian_pitch; // Tangage en radians
+  MavLinkMessageData.yaw = current_radian_yaw;     // Lacet en radians
+  MavLinkMessageData.rollspeed = 0.0;
+  MavLinkMessageData.pitchspeed = 0.0;
+  MavLinkMessageData.yawspeed = 0.0;
+
+  // État de la batterie
+  MavLinkMessageData.battery_id = 0;
+  MavLinkMessageData.battery_function = MAV_BATTERY_FUNCTION_ALL;
+  MavLinkMessageData.battery_type = MAV_BATTERY_TYPE_LIPO;
+  MavLinkMessageData.battery_temperature = 0; // 30.0 degrés Celsius
+  MavLinkMessageData.voltages[0] = 0;         // Exemple de tension de cellule
+  MavLinkMessageData.voltages[1] = 0;
+  MavLinkMessageData.voltages[2] = 0;
+  MavLinkMessageData.current_battery = 0;  // 10A
+  MavLinkMessageData.current_consumed = 0; // Consommé 2000 mAh
+  MavLinkMessageData.energy_consumed = -1;
+  MavLinkMessageData.battery_remaining = 0;
+
+  // État du système
+  MavLinkMessageData.autopilot_mode = MAV_AUTOPILOT_GENERIC;
+  MavLinkMessageData.base_mode = MAV_MODE_AUTO_ARMED;
+  MavLinkMessageData.custom_mode = 0;
+  MavLinkMessageData.system_status = MAV_STATE_ACTIVE;
+
+  // Mission
+  MavLinkMessageData.current_mission_seq = currentWPIndex; // Waypoint actuel
+  MavLinkMessageData.mission_result = 0;                   //;MAV_MISSION_ACCEPTED;
+
+  // GPS Status
+  MavLinkMessageData.gps_fix_type = 3;                         // 3D Fix
+  MavLinkMessageData.satellites_visible = satellites_quantity; // 10 satellites visibles
+
+  // Vitesse air
+  MavLinkMessageData.airspeed = 0;    // Vitesse de l'air en m/s
+  MavLinkMessageData.groundspeed = 0; // Vitesse au sol en m/s
+};
+
+// Fonction principale d'envoi à intervalles réguliers
+void PrepareMavlinkMessage(MAVLinkMessageStructure &MavLinkMessageMavLinkMessageData)
+{
+  // mavlink_message_t msg;
   uint8_t buffer[MAVLINK_MAX_PACKET_LEN];
 
-  mavlink_msg_heartbeat_pack(1, MAV_COMP_ID_AUTOPILOT1, &msg, MAV_TYPE_FIXED_WING, MAV_AUTOPILOT_GENERIC, MAV_MODE_FLAG_MANUAL_INPUT_ENABLED, 0, MAV_STATE_STANDBY);
-  // Sérialiser le message MAVLink
+  unsigned long currentMillis = millis();
 
-  uint16_t len = mavlink_msg_to_send_buffer(buffer, &msg);
+  // Envoyer le heartbeat
+  if (currentMillis - lastHeartbeatSend >= heartbeatInterval)
+  {
+    mavlink_msg_heartbeat_pack(system_id, component_id, &msg, MAV_TYPE_FIXED_WING, MAV_AUTOPILOT_GENERIC, MavLinkMessageData.base_mode, MavLinkMessageData.custom_mode, MavLinkMessageData.system_status);
+    lastHeartbeatSend = currentMillis;
+    sendMavlinkMessage(&msg);
+  }
 
-  // Envoyer le message sérialisé via ESP-NOW
-  esp_err_t result = esp_now_send(RxMACaddress, buffer, len);
+  // Envoyer l'Attiude
+  if (currentMillis - lastAttitudeSend >= globalPositionInterval)
+  {
+    mavlink_msg_attitude_pack(system_id, component_id, &msg, MavLinkMessageData.time_boot_ms, MavLinkMessageData.roll, MavLinkMessageData.pitch, MavLinkMessageData.yaw, MavLinkMessageData.rollspeed, MavLinkMessageData.pitchspeed, MavLinkMessageData.yawspeed);
+    lastAttitudeSend = currentMillis;
+    sendMavlinkMessage(&msg);
+  }
+
+  // Envoyer la position globale
+  if (currentMillis - lastGlobalPositionSend >= globalPositionInterval)
+  {
+    mavlink_msg_global_position_int_pack(system_id, component_id, &msg, MavLinkMessageData.time_boot_ms, MavLinkMessageData.lat, MavLinkMessageData.lon, MavLinkMessageData.alt, MavLinkMessageData.relative_alt, MavLinkMessageData.vx, MavLinkMessageData.vy, MavLinkMessageData.vz, MavLinkMessageData.hdg);
+    lastGlobalPositionSend = currentMillis;
+    sendMavlinkMessage(&msg);
+  }
+
+  // Envoyer le statut de la batterie
+  if (currentMillis - lastBatteryStatusSend >= batteryStatusInterval)
+  {
+    mavlink_msg_battery_status_pack(system_id, component_id, &msg, MavLinkMessageData.battery_id, MavLinkMessageData.battery_function, MavLinkMessageData.battery_type, MavLinkMessageData.battery_temperature, MavLinkMessageData.voltages, MavLinkMessageData.current_battery, MavLinkMessageData.current_consumed, MavLinkMessageData.energy_consumed, MavLinkMessageData.battery_remaining, 0, 0, 0, 0, 0);
+    lastBatteryStatusSend = currentMillis;
+    sendMavlinkMessage(&msg);
+  }
+
+  // Envoyer le statut de la mission
+  if (currentMillis - lastMissionStatusSend >= missionStatusInterval)
+  {
+    mavlink_msg_mission_current_pack(system_id, component_id, &msg, MavLinkMessageData.current_mission_seq, MavLinkMessageData.current_mission_total, MavLinkMessageData.mission_state, MavLinkMessageData.mission_mode, MavLinkMessageData.mission_id, MavLinkMessageData.fence_id, MavLinkMessageData.rally_points_id);
+    lastMissionStatusSend = currentMillis;
+    sendMavlinkMessage(&msg);
+  }
 }
+
+void sendMavlinkMessage(mavlink_message_t *msg)
+{
+  uint8_t buffer[MAVLINK_MAX_PACKET_LEN];
+  int message_length = mavlink_msg_to_send_buffer(buffer, msg);
+
+  esp_err_t result = esp_now_send(RxMACaddress, buffer, message_length);
+  if (result == ESP_OK)
+  {
+    Serial.println("Message MAVLink envoyé via ESP-NOW.");
+  }
+  else
+  {
+    Serial.println("Erreur lors de l'envoi du message MAVLink.");
+  }
+}
+
+// Fonction pour envoyer un message de Heartbeat
+void sendHeartbeat()
+{
+  mavlink_msg_heartbeat_pack(system_id, component_id, &msg, MAV_TYPE_FIXED_WING, MAV_AUTOPILOT_GENERIC, MavLinkMessageData.base_mode, MavLinkMessageData.custom_mode, MavLinkMessageData.system_status);
+
+  sendMavlinkMessage(&msg);
+}
+
+//////// WAYPOINTS FUNCTIONS ////////
 
 // Envoyer une requête de waypoint
 void sendMissionRequest(uint16_t seq)
 {
-  mavlink_message_t msg;
+  // mavlink_message_t msg;
   uint8_t buffer[MAVLINK_MAX_PACKET_LEN];
 
   mavlink_msg_mission_request_pack(system_id, component_id, &msg, system_id, component_id, seq, MAV_MISSION_TYPE_MISSION);
@@ -291,7 +414,7 @@ void sendMissionRequest(uint16_t seq)
 // Envoyer une confirmation de réception de tous les waypoints
 void sendMissionAck()
 {
-  mavlink_message_t msg;
+  // mavlink_message_t msg;
   uint8_t buffer[MAVLINK_MAX_PACKET_LEN];
 
   mavlink_msg_mission_ack_pack(system_id, component_id, &msg, system_id, component_id, 0, MAV_MISSION_ACCEPTED, MAV_MISSION_TYPE_MISSION);

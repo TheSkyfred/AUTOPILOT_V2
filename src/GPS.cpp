@@ -29,7 +29,7 @@ double traveledDistance = 0.0;
 
 unsigned long waypoint_distance = 0;
 
-int satellites = 0;
+int satellites_quantity = 0;
 double hdop = 0;
 
 void init_GPS()
@@ -44,11 +44,15 @@ void update_GPS()
     {
         if (gps.encode(Serial2.read()))
         {
+
+if(gps.satellites.isValid()){
+satellites_quantity = gps.satellites.value(); 
+}
             if (gps.location.isValid())
             {
                 current_latitude = gps.location.lat();
                 current_longitude = gps.location.lng();
-                satellites = gps.satellites.value();
+
                 target_heading = TinyGPSPlus::courseTo(current_latitude, current_longitude, target_latitude, target_longitude);
 
                 heading_error = abs(current_heading - target_heading);
@@ -162,4 +166,16 @@ void updateTraveledDistance() {
     last_latitude = current_latitude;
     last_longitude = current_longitude;
   }
+}
+
+// Vérifier si le waypoint est atteint (distance horizontale et altitude)
+bool isWaypointReached(EEPROM_Waypoint current_wayppoint) {
+  bool altitudeValid = true;
+
+  // Si l'altitude doit être respectée, vérifier la différence d'altitude
+  if (current_wayppoint.altHold) {
+    altitudeValid = abs(current_barometer_altitude - target_altitude) <= altitude_threshold;
+  }
+
+  return (waypoint_distance <= distance_threshold) && altitudeValid;
 }

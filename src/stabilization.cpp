@@ -92,6 +92,7 @@ void stabilize(
     float yaw_step_value)
 {
     update_PID();
+    compute_PID();
 
     if (roll_block_condition)
     {
@@ -108,31 +109,47 @@ void stabilize(
         yaw_correction = SERVOMID;
     }
 
-    // RECOVERY :
-    if (abs(current_roll - prev_roll_correction) > roll_tolerance || abs(current_pitch - prev_pitch_correction > pitch_tolerance))
+    if (roll_block_condition || pitch_step_condition)
     {
-        currentNavigationMode = RECOVERY;
-        //  currentRecorveryMode = ZeroStabilize;
+        // RECOVERY :
+        if (abs(current_roll - prev_roll_correction) > roll_tolerance || abs(current_pitch - prev_pitch_correction > pitch_tolerance))
+        {
+            isTurning = false; // Situation is too dangerous, we quit the current turn
+            isCorrectingAltitude = false;
+            currentNavigationMode = STABILIZING;
+        }
+
+        else
+        { // CORRECTION WITH STEP :
+            if (roll_step_condition && (current_roll - prev_roll_correction) < 1)
+            {
+                // Si l'inclinaison précédente a été atteinte, on met à jour l'inclinaison demandée
+                prev_roll_correction = updateRollAngleRequest(prev_roll_correction, target_roll);
+            }
+
+            else if (!roll_step_condition)
+            {
+            }
+
+            if (pitch_step_condition && (current_roll - prev_roll_correction) < 1)
+            {
+                // Si l'inclinaison précédente a été atteinte, on met à jour l'inclinaison demandée
+                prev_roll_correction = updatePitchAngleRequest(prev_pitch_correction, target_pitch);
+            }
+        }
     }
     else
-    { // CORRECTION WITH STEP :
-
-        if (roll_step_condition && (current_roll - prev_roll_correction) < 1)
-        {
-            // Si l'inclinaison précédente a été atteinte, on met à jour l'inclinaison demandée
-            prev_roll_correction = updateRollAngleRequest(prev_roll_correction, target_roll);
-        }
-
-        if (pitch_step_condition && (current_roll - prev_roll_correction) < 1)
-        {
-            // Si l'inclinaison précédente a été atteinte, on met à jour l'inclinaison demandée
-            prev_roll_correction = updatePitchAngleRequest(prev_pitch_correction, target_pitch);
-        }
-
-        compute_PID();
-
-        set_servos(roll_correction, pitch_correction, yaw_correction);
+    {
+        prev_roll_correction = 0;
+        prev_pitch_correction = 0;
+        prev_yaw_correction = 0;
     }
+
+    if (currentTurnMode = YAW_CORRECTION)
+    {
+        yaw_correction = SERVOMID + yaw_correction;
+    }
+    set_servos(roll_correction, pitch_correction, yaw_correction);
 };
 
 unsigned long stabilizationStartTime = 0;
@@ -185,33 +202,25 @@ void update_PID() // UPDATE PID ACCORDING TO THE CURRENT MODE
     switch (currentNavigationMode)
     {
     case TAKEOFF:
-
         rollKp = PID_TAKEOFF[0];
         rollKi = PID_TAKEOFF[1];
         rollKd = PID_TAKEOFF[2];
-
         break;
 
     case NAVIGATE:
-
         rollKp = PID_NAVIGATE[0];
         rollKi = PID_NAVIGATE[1];
         rollKd = PID_NAVIGATE[2];
-
         break;
 
     case LANDING:
-
         rollKp = PID_LANDING[0];
         rollKi = PID_LANDING[1];
         rollKd = PID_LANDING[2];
-
         break;
 
     default:
-
         Serial.println("Erreur dans les modes de PID");
-
         break;
     }
 
@@ -282,16 +291,27 @@ void calculate_altitude_factor()
     StartWaypointDistance = waypoint_distance;
 }
 
-void adjustPitchForAltitude(float current_barometer_altitude, float target_altitude)
+double adjustPitchForAltitude(float current_barometer_altitude, float target_altitude)
 {
-
+    double adjustedPitchforAltitude = 0;
     altitudeError = target_altitude - current_barometer_altitude;
 
     K_altitude = (altitude_error * waypoint_distance) / (StartAltitudeError * StartWaypointDistance);
 
     // Calculer la correction du pitch proportionnellement à l'erreur d'altitude
-    target_pitch = K_altitude * altitudeError;
+    adjustedPitchforAltitude = K_altitude * altitudeError;
 
+    // Limiter l'angle de pitch pour ne pas dépasser max_pitch_angle
+    if (adjustedPitchforAltitude > max_pitch_angle)
+    {
+        adjustedPitchforAltitude = max_pitch_angle;
+    }
+    else if (adjustedPitchforAltitude < -max_pitch_angle)
+    {
+        adjustedPitchforAltitude = -max_pitch_angle;
+    }
+
+    return adjustedPitchforAltitude;
     /*
         if (distanceToTarget < endTransitionDistance)
         {

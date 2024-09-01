@@ -31,10 +31,9 @@ x, y, z: Latitude, longitude et altitude cible pour l'atterrissage.
 #include "math.h"
 #include "GPS.h"
 
-#include <EEPROM.h>  // Bibliothèque pour gérer l'EEPROM
+#include <EEPROM.h> // Bibliothèque pour gérer l'EEPROM
 
 MavLinkWayPoint MLWaypoints[100];
-
 
 double lastLatitude = 0.0;
 double lastLongitude = 0.0;
@@ -57,9 +56,7 @@ EEPROM_Waypoint landing_point = {0, 0, 0}; // Point d'atterrissage
 
 EEPROM_Waypoint waypointData[] = {
     {0, 0, 0}, // point HOME
-    {43.61327522970758, 3.843247992486303, 40},
-    {43.61384303201776, 3.8317396672563824, 40},
-    {43.60621397901305, 3.8191815299885015, 40}};
+};
 
 int numWaypoints = sizeof(waypointData) / sizeof(waypointData[0]);
 
@@ -165,18 +162,17 @@ void updateLandingPoint()
     }
 }
 
-
-
-
 // Enregistrer un waypoint dans l'EEPROM
-void saveWaypointToEEPROM(const MavLinkWayPoint& MLWaypoints) {
+void saveWaypointToEEPROM(const MavLinkWayPoint &MLWaypoints)
+{
     int address = sizeof(MLWaypoints) + MLWaypoints.seq * sizeof(MavLinkWayPoint);
     EEPROM.put(address, MLWaypoints);
     EEPROM.commit();
 }
 
 // Charger un waypoint depuis l'EEPROM
-EEPROM_Waypoint loadWaypointFromEEPROM(uint16_t seq) {
+EEPROM_Waypoint loadWaypointFromEEPROM(uint16_t seq)
+{
     int address = sizeof(MLWaypoints) + seq * sizeof(MavLinkWayPoint);
     EEPROM_Waypoint current_ML_waypoint;
     EEPROM.get(address, current_ML_waypoint);

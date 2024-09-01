@@ -1,11 +1,12 @@
 #ifndef DEF_H_
 #define DEF_H_
 
-#include <stdint.h> 
-
+#include <stdint.h>
 
 extern const double myPI;
 
+extern bool isTurning;
+extern bool isCorrectingAltitude;
 extern bool stabilized;
 
 extern double current_heading;
@@ -32,10 +33,13 @@ extern int takeoff_security_altitude;
 // GYROSCOPE
 
 extern double current_roll, current_pitch, current_yaw;
+extern double current_radian_roll, current_radian_pitch, current_radian_yaw;
 extern double target_roll, target_pitch, target_yaw;
 
 // LANDING
 extern float landing_altitude;
+extern int langing_angle;
+extern int flare_angle;
 
 // BATTERY
 extern const float V_MIN;
@@ -45,8 +49,7 @@ extern const long batteryCheckInterval;
 // PID
 extern float PID_TAKEOFF[], PID_NAVIGATE[], PID_LANDING[];
 
-
-//BATTERY 
+// BATTERY
 extern const float safetyBatteryMargin;
 
 // BUZZER
@@ -75,14 +78,13 @@ extern const int pitch_tolerance;
 
 // GPS & CORRECTIONS
 
+extern int satellites_quantity;
 extern double current_latitude;
 extern double current_longitude;
 
 extern float home_latitude;  // A PASSER EN DOUBLE
 extern float home_longitude; // A PASSER EN DOUBLE
 extern float home_altitude;
-
-extern float landing_altitude;
 
 extern int heading_error;
 extern unsigned long waypoint_distance;
@@ -112,6 +114,9 @@ extern const int heading_tolerance;
 extern const int STABILIZATION_TOLERANCE;
 extern const unsigned long STABILIZATION_PERIOD;
 
+extern float distance_threshold; // Distance horizontale (en mètres) considérée comme atteinte pour un waypoint
+extern float altitude_threshold; // Seuil de tolérance d'altitude (en mètres)
+
 // ENGINE
 extern const int motorSpeedMIN;
 extern const int motorSpeedMAX;
@@ -133,6 +138,7 @@ typedef struct struct_message
   int current_roll;
   int current_pitch;
   int current_yaw;
+
   int satellites;
   // float currentMode;
 
@@ -146,6 +152,7 @@ typedef struct EEPROM_Waypoint
   double latitude;
   double longitude;
   double altitude;
+  int altHold;
 } EEPROM_Waypoint;
 
 extern EEPROM_Waypoint waypointData[];
@@ -156,8 +163,6 @@ extern int current_waypoint_index;
 
 // DISTANCE
 extern double traveledDistance;
-
-
 
 // Structure pour stocker les informations des waypoints
 struct MavLinkWayPoint
@@ -181,5 +186,68 @@ struct MavLinkWayPoint
 
 extern MavLinkWayPoint MLWaypoints[100];
 
+struct MAVLinkMessageStructure
+{
+  uint8_t system_id;
+  uint8_t component_id;
+
+  // Position globale (GLOBAL_POSITION_INT)
+  uint32_t time_boot_ms; // Temps depuis le démarrage en millisecondes
+  int32_t lat;           // Latitude en degrés * 1E7
+  int32_t lon;           // Longitude en degrés * 1E7
+  int32_t alt;           // Altitude absolue en millimètres (par rapport au niveau de la mer)
+  int32_t relative_alt;  // Altitude relative en millimètres (par rapport au terrain)
+  int16_t vx;            // Vitesse dans l'axe X en cm/s
+  int16_t vy;            // Vitesse dans l'axe Y en cm/s
+  int16_t vz;            // Vitesse dans l'axe Z en cm/s
+  uint16_t hdg;          // Cap en centi-degrés (0.01 degrés)
+
+  // Attitude (ATTITUDE)
+  float roll;       // Roulis en radians
+  float pitch;      // Tangage en radians
+  float yaw;        // Lacet en radians
+  float rollspeed;  // Vitesse de roulis en radians/s
+  float pitchspeed; // Vitesse de tangage en radians/s
+  float yawspeed;   // Vitesse de lacet en radians/s
+
+  // État de la batterie (BATTERY_STATUS)
+  uint8_t battery_id;          // ID de la batterie
+  uint8_t battery_function;    // Fonction de la batterie
+  uint8_t battery_type;        // Type de batterie
+  int16_t battery_temperature; // Température de la batterie en centi-degrés Celsius
+  uint16_t voltages[4];        // Tension de chaque cellule de la batterie en millivolts
+  int16_t current_battery;     // Courant de la batterie en 10 mA
+  int32_t current_consumed;    // Courant total consommé en mAh
+  int32_t energy_consumed;     // Énergie totale consommée en 1/1000 de Joules
+  int8_t battery_remaining;    // Pourcentage de batterie restante (0 à 100)
+
+  // État du système (HEARTBEAT)
+  uint8_t autopilot_mode; // Mode de l'autopilote
+  uint8_t base_mode;      // Mode de base du système
+  uint32_t custom_mode;   // Mode personnalisé
+  uint8_t system_status;  // État général du système
+
+  // Mission (MISSION_CURRENT et MISSION_ITEM_REACHED)
+  uint16_t current_mission_seq;   // Numéro du waypoint actuellement actif
+  uint16_t current_mission_total; // Numéro du waypoint actuellement actif
+
+  uint8_t mission_result; // Résultat de la mission ou du waypoint (succès, échec, etc.)
+  uint8_t mission_state;
+  uint8_t mission_mode;
+  uint32_t mission_id;
+  uint32_t fence_id;
+  uint32_t rally_points_id;
+
+  // Statut GPS (GPS_RAW_INT)
+  uint8_t gps_fix_type;       // Type de correction GPS (2D, 3D, DGPS, etc.)
+  uint8_t satellites_visible; // Nombre de satellites visibles
+
+  // Vitesse air (VFR_HUD)
+  float airspeed;    // Vitesse de l'air en m/s
+  float groundspeed; // Vitesse par rapport au sol en m/s
+
+  // Autres données pertinentes
+  // Ajoute ici tout autre paramètre nécessaire à ton application
+};
 
 #endif /* DEF_H_ */

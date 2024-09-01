@@ -7,8 +7,7 @@
 #include <SimpleKalmanFilter.h>
 
 SimpleKalmanFilter kalmanFilter(3.0, 0.5, 0.05); // Mesure de variance, Processus de variance, Estimation d'erreur initiale
-//2, 2, 0.01 //Other parameters for KALMAN FILTER
-
+// 2, 2, 0.01 //Other parameters for KALMAN FILTER
 
 /* Set the delay between fresh samples */
 uint16_t BNO055_SAMPLERATE_DELAY_MS = 10;
@@ -21,8 +20,12 @@ double current_pitch = 0;
 double current_roll = 0;
 double current_yaw = 0;
 
+double current_radian_roll = 0, current_radian_pitch = 0, current_radian_yaw = 0;
+
 float heading = 0;
 double current_heading = 0;
+
+float radian_converter = 57.32;
 
 void init_gyroscope()
 {
@@ -54,9 +57,13 @@ void update_gyroscope()
   float quatJ = quat.y();
   float quatK = quat.z();
 
-  current_pitch = asin(2.0f * (quatReal * quatI + quatJ * quatK)) * 57.32;
-  current_roll = atan2(2.0f * (quatReal * quatJ - quatK * quatI), 1.0f - 2.0f * (quatI * quatI + quatJ * quatJ)) * 57.32;
-  current_yaw = atan2(2.0f * (quatReal * quatK + quatI * quatJ), 1.0f - 2.0f * (quatJ * quatJ + quatK * quatK)) * 57.32;
+  current_radian_roll = asin(2.0f * (quatReal * quatI + quatJ * quatK));
+  current_radian_pitch = atan2(2.0f * (quatReal * quatJ - quatK * quatI), 1.0f - 2.0f * (quatI * quatI + quatJ * quatJ));
+  current_radian_yaw = atan2(2.0f * (quatReal * quatK + quatI * quatJ), 1.0f - 2.0f * (quatJ * quatJ + quatK * quatK));
+
+  current_pitch = current_radian_roll * radian_converter;
+  current_roll = current_radian_pitch * radian_converter;
+  current_yaw = current_radian_yaw * radian_converter;
 
   // Afficher le cap magnétique en degrés
   bno.getEvent(&magnetometerData, Adafruit_BNO055::VECTOR_MAGNETOMETER);

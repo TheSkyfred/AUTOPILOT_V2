@@ -3,9 +3,7 @@
 
 #define SerialMonitor
 
-
-#define EEPROM_SIZE 4096  // Taille de l'EEPROM (ESP32 a jusqu'à 4096 octets)
-
+#define EEPROM_SIZE 4096 // Taille de l'EEPROM (ESP32 a jusqu'à 4096 octets)
 
 // SONAR
 #define MYBLUETOOTH false
@@ -29,7 +27,6 @@
 
 #define TELEMETRY_INTERVAL 1000
 
-
 #define TFT_CS 15
 #define TFT_RST 2 // Vous pouvez aussi utiliser -1 si le pin de reset n'est pas connecté
 #define TFT_DC 4
@@ -37,5 +34,12 @@
 #define TFT_SCLK 18
 
 #define ESCPIN 9
+
+// TELEMTRY
+//  Intervalles d'envoi (en millisecondes)
+#define globalPositionInterval 1000 // Envoyer la position globale toutes les secondes
+#define heartbeatInterval 1000      // Envoyer le heartbeat toutes les secondes
+#define batteryStatusInterval 5000  // Envoyer le statut de la batterie toutes les 5 secondes
+#define missionStatusInterval 2000  // Envoyer le statut de mission toutes les 2 secondes
 
 #endif /* BAROMETER_H_ */

@@ -34,8 +34,7 @@
 #include "myDriver.h"
 #include "waypoints.h"
 
-#include <EEPROM.h>  // Bibliothèque pour gérer l'EEPROM
-
+#include <EEPROM.h> // Bibliothèque pour gérer l'EEPROM
 
 FlightMode currentMode = INIT;
 EngineStatus currentEngineStatus = ENGINE_OFF;
@@ -49,6 +48,8 @@ bool isTurning = false;
 bool isCorrectingAltitude = false;
 float avgDistance = 0;
 
+static unsigned long last_heartbeat = 0;
+
 // BATTERY:
 unsigned long previousMillis = 0;
 unsigned long lastBatteryCheckMillis = 0; // Temps du dernier contrôle de batterie
@@ -61,11 +62,11 @@ unsigned long executionTime = 0; // Pour enregistrer le temps actuel
 void setup()
 {
 
-      // Initialiser l'EEPROM
-    EEPROM.begin(EEPROM_SIZE);
+  // Initialiser l'EEPROM
+  EEPROM.begin(EEPROM_SIZE);
 
-    // Charger les paramètres de l'EEPROM
-    EEPROM.get(0, MLWaypoints);
+  // Charger les paramètres de l'EEPROM
+  EEPROM.get(0, MLWaypoints);
 
   Wire.begin();
   Wire.setClock(400000); // Définir le taux de données I2C à 400 kHz
@@ -104,26 +105,22 @@ void loop()
 {
   startTime = millis();
   unsigned long currentMillis = millis();
+  sendHeartbeat(); // SEND HEARBEAT TO TELEMETRY
 
   // update_telemetry();
   update_sensors();
-
-  endTime = millis();
-
-  executionTime = endTime - startTime;
-
-
-    static unsigned long last_heartbeat = 0;
-    // Envoyer périodiquement des messages HEARTBEAT pour indiquer que le système est actif
-    if (millis() - last_heartbeat > TELEMETRY_INTERVAL) {
-        sendHeartbeat();
-        last_heartbeat = millis();
-    }
 
   switch (currentMode)
   {
 
   case INIT:
+
+    // Envoyer périodiquement des messages HEARTBEAT pour indiquer que le système est actif
+    if (millis() - last_heartbeat > TELEMETRY_INTERVAL)
+    {
+      sendHeartbeat();
+      last_heartbeat = millis();
+    }
 
     GPS_set_home();     // We Define the Home Point Position (Latitude, longitude, altitude)
     update_waypoints(); // Update GPS points with Home Point
@@ -138,6 +135,13 @@ void loop()
     break; // INIT
 
   case ARMED:
+
+    // Envoyer périodiquement des messages HEARTBEAT pour indiquer que le système est actif
+    if (millis() - last_heartbeat > TELEMETRY_INTERVAL)
+    {
+      sendHeartbeat();
+      last_heartbeat = millis();
+    }
 
     // BUZZER HELP
     target_pitch = takeoff_angle;
@@ -180,19 +184,17 @@ void loop()
       break;
     }
 
-    /*
-        // check if current_altitude > home_altitude + 20m
-        else if (current_GPS_altitude > home_point.altitude + takeoff_security_altitude) // REPLACE BY IF !!
-        {
-          currentMode = NAVIGATE; // Go to NAVIGATE Mode
-          break;
-        }
-    */
+    // check if current_altitude > home_altitude + 20m
+    else if (current_GPS_altitude > home_point.altitude + takeoff_security_altitude) // REPLACE BY IF !!
+    {
+      currentMode = NAVIGATE; // Go to NAVIGATE Mode
+      break;
+    }
 
     else
     {
-      Serial.println("TAKEOFF IN PROGRESS");
       // STABILIZE THE PLANE
+      stabilize(false, target_roll, false, 0, false, target_pitch, false, 0, true, 0, false, 0);
     }
 
     break; // TAKEOFF
@@ -208,7 +210,7 @@ void loop()
     {
 
     case FLYING:
-      updateTraveledDistance(); //See if we do this only during FLYING mode or during Navigate Mode
+      updateTraveledDistance(); // See if we do this only during FLYING mode or during Navigate Mode
 
       // Vérifier la batterie toutes les minutes
       if (currentMillis - lastBatteryCheckMillis >= batteryCheckInterval)
@@ -266,12 +268,14 @@ void loop()
 
         if (abs(heading_error) < yaw_turn_range)
         {
+          isTurning = true;
           currentTurnMode = YAW_CORRECTION;
           // We do a yaw_turn
           break;
         }
         else
         {
+          isTurning = true;
           currentTurnMode = BANKED_TURN;
           break;
         }
@@ -280,12 +284,32 @@ void loop()
 
       case BANKED_TURN:
 
+        // Check if the banked turn is DONE
+        if (abs(heading_error) < yaw_turn_range && abs(current_roll) < roll_tolerance)
+        {
+          isTurning = false;
+          currentNavigationMode = FLYING;
+        }
+
         target_roll = map(heading_error, -180, 180, -max_roll_angle, max_roll_angle);
-        target_pitch = 0;
+        target_pitch = 0; // BLOCKED
+        target_yaw = 0;   // BLOCKED
+
+        stabilize(false, target_roll, true, roll_step_value, true, 0, false, 0, true, 0, false, 0);
+
         break;
 
       case YAW_CORRECTION:
 
+        if (abs(heading_error) < heading_tolerance)
+        {
+          isTurning = false;
+          currentNavigationMode = FLYING;
+        }
+
+        target_roll = 0;
+        target_pitch = 0;
+        target_yaw = target_heading;
         break;
 
       default:
@@ -298,10 +322,10 @@ void loop()
     case CORRECTING_ALTITUDE:
       isCorrectingAltitude = true;
 
+      // CHECK IF ALTITUDE CORRECTION IS DONE
       if (altitude_error < altitude_tolerance)
       {
         isCorrectingAltitude = false;
-
         currentNavigationMode = STABILIZING;
         break;
       }
@@ -309,32 +333,36 @@ void loop()
       {
         // correct altitude
         target_roll = 0;
-        adjustPitchForAltitude(current_barometer_altitude, target_altitude);
+        target_pitch = adjustPitchForAltitude(current_barometer_altitude, target_altitude);
+        target_yaw = 0; // blocked
 
-        // Limiter l'angle de pitch pour ne pas dépasser max_pitch_angle
-        if (target_pitch > max_pitch_angle)
-        {
-          target_pitch = max_pitch_angle;
-        }
-        else if (target_pitch < -max_pitch_angle)
-        {
-          target_pitch = -max_pitch_angle;
-        }
+        stabilize(false, target_roll, false, 0, false, target_pitch, true, pitch_step_value, true, 0, false, 0);
 
         //   target_pitch = constrain((target_altitude - current_barometer_altitude), -max_roll_angle, max_roll_angle);
       }
 
+      if (abs(altitude_error) < altitude_tolerance && current_pitch < pitch_tolerance)
+      {
+        isCorrectingAltitude = false;
+        currentNavigationMode = FLYING;
+      }
       break;
 
     case STABILIZING:
       target_roll = 0;
       target_pitch = 0;
+      target_yaw = 0;
+
       check_stability();
 
       if (stabilized)
       {
         currentNavigationMode = FLYING;
       }
+      break;
+
+    case RECOVERY:
+      // to code
       break;
 
     default:
@@ -374,8 +402,8 @@ void loop()
 
       if (avgDistance <= 60.0)
       {
-        stopMotor(); // Arrêter le moteur lorsque la distance est inférieure à 60 cm
-                     // Se mettre en position de planner
+        stopMotor();                // Arrêter le moteur lorsque la distance est inférieure à 60 cm
+        currentLandingMode = FLARE; // Se mettre en position de planner
       }
       else
       {
@@ -389,7 +417,14 @@ void loop()
       break;
 
     case FLARE:
-      // to code
+
+      // Motor already OFF
+
+      target_roll = 0;
+      target_pitch = flare_angle;
+      target_yaw = 0;
+
+      stabilize(false, target_roll, false, 0, false, target_pitch, true, pitch_step_value, true, 0, false, 0);
 
       break;
 
@@ -411,6 +446,10 @@ void loop()
 
   } // End Switch Main Mode
 
+  // LOOP TIMER
+  endTime = millis();
+  executionTime = endTime - startTime;
+
   // AFFICHAGE :
   unsigned long currentBatteryMillis = millis();
   if (currentBatteryMillis - lastPrint >= (PRINT_INTERVAL / 4))
@@ -424,164 +463,4 @@ void loop()
 
     display_DATA(); // UPDATE SERIAL
   }
-}
-
-void display_DATA()
-{
-  Serial.print("Fr: ");
-  Serial.print(executionTime);
-  Serial.print(" Hz-");
-  Serial.print("S:");
-  Serial.print(stabilized);
-
-  Serial.print("-Mode:");
-  Serial.print(FlightModeToString(currentMode));
-  Serial.print("- WP:");
-  Serial.print(current_waypoint_index);
-
-  Serial.print("- Heading Er:");
-  Serial.print(heading_error);
-  /*
-  Serial.print(F(" - t_lat:"));
-  Serial.print(target_latitude);
-  Serial.print(F(" - t_long:"));
-  Serial.print(target_longitude);
-*/
-  switch (currentMode)
-  {
-  case INIT:
-
-    Serial.print(F(" -BMPAlt:"));
-    Serial.print(current_barometer_altitude);
-    Serial.print(F(" -Temp:"));
-    Serial.println(barometer_temperature);
-    break;
-
-  case ARMED:
-    Serial.print("-Heading:");
-    Serial.print(current_heading);
-    Serial.print(F("-Heading Target = "));
-    Serial.print(target_heading);
-    Serial.print(" -Roll:");
-    Serial.print(current_roll);
-    Serial.print("- Pitch :");
-    Serial.print(current_pitch);
-    Serial.print("-Target Pitch:");
-    Serial.print(target_pitch);
-    // Serial.print("-Hauteur sol:");
-    // Serial.print(current_GPS_altitude - home_altitude);
-    Serial.print("-Alti GPS:");
-    Serial.print(current_GPS_altitude);
-    Serial.print("-Alti BME:");
-    Serial.println(current_barometer_altitude);
-    break;
-
-  case TAKEOFF:
-
-    Serial.print("-Heading:");
-    Serial.print(current_heading);
-    Serial.print(F("-Heading Target = "));
-    Serial.print(target_heading);
-    Serial.print("- Pitch :");
-    Serial.print(current_pitch);
-    Serial.print("-Target Pitch:");
-    Serial.print(target_pitch);
-    // Serial.print("-Hauteur sol:");
-    // Serial.print(current_GPS_altitude - home_altitude);
-    Serial.print("-Alti GPS:");
-    Serial.print(current_GPS_altitude);
-    Serial.print("-Alti BME:");
-    Serial.print(current_barometer_altitude);
-    Serial.print(" -Roll:");
-    Serial.print(current_roll);
-    Serial.print(" -Pitch:");
-    Serial.print(current_pitch);
-    Serial.print(" -Yaw:");
-    Serial.println(current_yaw);
-
-    break;
-
-  case CALIBRATE_SPEED:
-    Serial.print(" CALIBRATION SPEED TEXT");
-
-    break;
-
-  case NAVIGATE:
-    Serial.print(" NavMode: ");
-    Serial.print(NavModeToString(currentNavigationMode));
-
-    switch (currentNavigationMode)
-    {
-
-    case FLYING:
-      break;
-    case CORRECTING_HEADING:
-      Serial.print("- TurnMode: ");
-      Serial.print(TurnModeToString(currentTurnMode));
-      Serial.print("Heading Error :");
-
-      Serial.print(heading_error);
-
-      break;
-    case CORRECTING_ALTITUDE:
-
-      Serial.print("- Alt Error: ");
-      Serial.print(altitude_error);
-      Serial.print("- K_Alt: ");
-      Serial.print(K_altitude);
-
-      break;
-    case STABILIZING:
-      break;
-
-      break;
-    }
-
-    Serial.print(" -TRoll:");
-    Serial.print(target_roll);
-    Serial.print(" -TPitch:");
-    Serial.print(target_pitch);
-    Serial.print(" -TYaw:");
-    Serial.println(target_yaw);
-
-    break;
-
-  case LANDING:
-
-    break;
-  }
-
-  /*Serial.print(F(" ; Press = "));
-  Serial.print(pressure);
-  Serial.println(" hPa");
-  */
-
-  /*    Serial.print("Error:");
-      Serial.print(headingError);
-      Serial.print(F("Angle = "));
-      Serial.print(angle);
-      */
-
-  /*
-      Serial.print(F(" ; RollInput = "));
-      Serial.print(RollInput);
-      Serial.print(F(" ; RollOutput = "));
-      Serial.print(RollOutput);
-
-      Serial.print(F(" ; RollservoPosition = "));
-      Serial.print(RollservoPosition);
-      Serial.print(F(" ; PitchInput = "));
-      Serial.print(PitchInput);
-      Serial.print(F(" ; PitchOuput = "));
-      Serial.print(PitchOutput);
-      Serial.print(F(" ; PitchservoPosition = "));
-      Serial.print(PitchservoPosition);
-      Serial.print(F(" ; YawInput = "));
-      Serial.print(YawInput);
-      Serial.print(F(" ; YawOutput = "));
-      Serial.print(YawOutput);
-
-      Serial.print(F(" ; YawservoPosition = "));
-      Serial.println(YawservoPosition);
-      */
 }
